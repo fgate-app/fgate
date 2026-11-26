@@ -48,7 +48,21 @@ test('independent system job records success and restores on failed post-install
  for(const ready of [true,false])await fixture(async m=>{
   const work=join(m.state,'system-work-fixture'),backup=join(m.state,'backup');await mkdir(join(work,'source'),{recursive:true});await mkdir(backup);await mkdir(m.release);
   await writeFile(join(work,'job.json'),JSON.stringify({commit}));await m.set({state:'installing'});const commands=[];
-  await runSystemUpdate({work,release:m.release,execute:async(command,args)=>{commands.push([command,...args]);return {stdout:args.includes('snapshot')?backup:'installer output',stderr:''};},healthFetch:async()=>new Response(JSON.stringify({ready}))});
+  await runSystemUpdate({work,prepare:false,release:m.release,execute:async(command,args)=>{commands.push([command,...args]);return {stdout:args.includes('snapshot')?backup:'installer output',stderr:''};},healthFetch:async()=>new Response(JSON.stringify({ready}))});
   assert.equal(m.snapshot().state,ready?'updated':'error');assert.equal(commands.some(args=>args.includes('restore')),!ready);if(ready)assert.equal(m.snapshot().current,commit.slice(0,7));
  });
+});
+
+test('module reuse checks source inputs, version, architecture and binary integrity',async()=>{
+ const {execFile}=await import('node:child_process'),{promisify}=await import('node:util');const result=await promisify(execFile)('python3',['-m','unittest','discover','-s','tests','-p','test_module_reuse.py']);assert.match(result.stderr,/OK/);
+});
+test('installer progress accepts only fixed stages and changes stage percentages',async()=>{
+ const {installerProgress}=await import('../server/system-update-progress.js');let previous=0;
+ for(const stage of ['dependencies','runtime','reuse','tor','lantern','outline','backup','web','frp','modules','package','activate','restart','health']){const row=installerProgress('FG_UPDATE_STAGE '+stage);assert.ok(row.progress>previous);previous=row.progress;}
+ assert.equal(installerProgress('secret arbitrary log'),null);assert.equal(installerProgress('FG_UPDATE_STAGE injected'),null);
+});
+test('resource downloader can prohibit every direct attempt',async()=>{
+ const {createResourceFetch}=await import('../server/resource-fetch.js');const paths=[];const gateway={id:'known',port:28001,secret:'a'.repeat(20)};
+ const get=createResourceFetch({gateways:()=>[gateway],allowDirect:false,request:async(_url,{gateway})=>{paths.push(gateway?.id);return {status:200,headers:new Headers(),body:Buffer.from('ok')};}});await get('https://example.com/');assert.deepEqual(paths,['known']);
+ await assert.rejects(createResourceFetch({allowDirect:false})('https://example.com/'),/unavailable/);
 });

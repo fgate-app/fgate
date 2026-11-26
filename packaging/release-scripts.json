@@ -26,6 +26,7 @@
   "platform-support.sh",
   "prepare-modules.py",
   "release-bundles.py",
+  "reuse-release-modules.py",
   "seed-container-modules.py",
   "system-update-worker.mjs"
 ]

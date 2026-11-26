@@ -48,9 +48,9 @@ export function curlRequest(url,{gateway,signal,maxBytes,timeoutMs=25000,headers
 }
 // Both module updates and subscriptions use this adapter. Complete bodies are
 // bounded before returning, so a truncated download can retry on another path.
-export function createResourceFetch({gateways=()=>[],request=curlRequest,maxBytes=128*1024*1024}={}){
+export function createResourceFetch({gateways=()=>[],request=curlRequest,maxBytes=128*1024*1024,allowDirect=true}={}){
  return async (input,options={})=>{
-  const original=resourceUrl(String(input)),paths=[null,...validDownloadGateways(await gateways())],limit=options.maxBytes ?? maxBytes;
+  const original=resourceUrl(String(input)),paths=[...(allowDirect?[null]:[]),...validDownloadGateways(await gateways())],limit=options.maxBytes ?? maxBytes;
   for(const gateway of paths){
    if(options.signal?.aborted)throw new PublicError('Download cancelled.');
    try{let url=original;

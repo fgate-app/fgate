@@ -35,6 +35,8 @@ def verify(root,platform):
 
 def prepare(root,platform):
  for id,(version,folder) in layout(root,platform).items():
+  print('FG_UPDATE_STAGE '+id,flush=True)
+  print('FG_UPDATE_ACTION '+('reuse' if folder.exists() else 'download' if id=='tor' else 'build'),flush=True)
   if id=='outline' and not (folder/'outline-bridge').is_file():subprocess.run(['sh',str(root/'scripts/build-outline.sh'),'linux',platform.split('-')[1]],check=True)
   if id=='lantern' and not folder.is_dir():subprocess.run(['python3',str(root/'scripts/build-lantern.py'),'--platform',platform,'--output',str(folder.parent)],check=True)
   if id=='tor' and not folder.is_dir():

@@ -499,7 +499,7 @@ async function statusNetwork() {
 }
 
 let moduleDownloadGateways=[],moduleBatchTask=null;
-const systemUpdates=new SystemUpdates({fetchImpl:createResourceFetch({gateways:()=>moduleDownloadGateways})});
+const systemUpdates=new SystemUpdates({gateways:()=>moduleDownloadGateways,fetchImpl:createResourceFetch({gateways:()=>moduleDownloadGateways})});
 const moduleUpdates=new ModuleUpdates({fetchImpl:createResourceFetch({gateways:()=>moduleDownloadGateways}),restart:async id=>{const zapret=zapretCurrent;await moduleUpdates.restartService(id);if(id==='zapret' && zapret)await zapretApply(zapret);}});
 const strategyDiagnostics=new ProxyStrategyHelper({run,paths:zapretPaths,stopDaemon:stopOwnedDaemon,runDir:RUN_DIR});
 

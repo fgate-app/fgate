@@ -66,3 +66,5 @@ server/tor/bin
 
 !scripts/extract-system.py
 !scripts/system-update-worker.mjs
+
+!scripts/reuse-release-modules.py

@@ -44,6 +44,8 @@ ensure_runtime() {
  printf '%s\n' "$runtime_target"
 }
 
+update_stage() { printf 'FG_UPDATE_STAGE %s\n' "$1"; }
+
 mode=native
 check=0
 while [ "$#" -gt 0 ]; do
@@ -100,6 +102,7 @@ done
 cd "$ROOT"
 PATH="/usr/sbin:/usr/bin:/sbin:/bin:$PATH";export PATH
 export DEBIAN_FRONTEND=noninteractive
+update_stage dependencies
 apt-get update
 apt-get install -y --no-install-recommends ca-certificates openssh-client curl python3 xz-utils tar unzip make gcc g++ pkg-config libnetfilter-queue-dev libcap-dev zlib1g-dev libmnl-dev libnfnetlink-dev liblua5.4-dev libluajit-5.1-dev hostapd dnsmasq-base nftables iproute2 iw rfkill procps iputils-ping kmod
 # Own daemons are started by the helper, not the distribution's hostapd unit.
@@ -108,10 +111,14 @@ python3 -c 'import sys;assert sys.version_info >= (3,12), "Python 3.12 or newer 
 if [ ! -c /dev/net/tun ];then modprobe tun;fi
 runtime=/opt/freedomgate/runtime
 install -d -m 0755 /opt/freedomgate "$runtime"
+update_stage runtime
 go_dir=$(ensure_runtime go)
 PATH="$go_dir/bin:$PATH";export PATH
+update_stage reuse
+if [ -n "${FREEDOMGATE_REUSE_RELEASE:-}" ];then python3 scripts/reuse-release-modules.py --source "$FREEDOMGATE_REUSE_RELEASE" --target "$ROOT" --platform "linux-$arch";fi
 python3 scripts/release-bundles.py --platform "linux-$arch" --prepare
 node_dir=$(ensure_runtime node)
+update_stage backup
 install_backup=$(python3 scripts/install-transaction.py snapshot)
 install_committed=0
 activation_started=0
@@ -119,13 +126,17 @@ trap rollback_install EXIT
 trap 'exit 130' INT
 trap 'exit 143' HUP TERM
 PATH="$node_dir/bin:$PATH";export PATH
+update_stage web
 if [ ! -f web/dist/index.html ] || [ ! -f node_modules/yaml/package.json ];then npm ci --ignore-scripts;fi
 if [ ! -f web/dist/index.html ];then npm run build;fi
+update_stage frp
 python3 scripts/fetch-access-modules.py --platform linux-arm64 --platform linux-amd64
+update_stage modules
 python3 scripts/prepare-modules.py --platform "linux-$arch" --output /opt/freedomgate/modules
 if ! id freedomgate >/dev/null 2>&1;then useradd --system --home-dir /var/lib/freedomgate --shell /usr/sbin/nologin freedomgate;fi
 install -d -m 0755 /opt/freedomgate/releases /opt/freedomgate/module-updates /etc/freedomgate
 if [ ! -d /var/lib/freedomgate ];then install -d -m 0700 -o freedomgate -g freedomgate /var/lib/freedomgate;fi
+update_stage package
 release_dir=/opt/freedomgate/releases/$(date -u +%Y%m%dT%H%M%SZ)-$$
 mkdir "$release_dir"
 python3 scripts/package-tree.py --source "$ROOT" --target "$release_dir"
@@ -139,6 +150,7 @@ runuser -u freedomgate -- /opt/freedomgate/modules/mihomo/current/mihomo -v
 if [ -x /opt/freedomgate/modules/tor/current/tor/tor ];then
  runuser -u freedomgate -- env LD_LIBRARY_PATH=/opt/freedomgate/modules/tor/current/tor /opt/freedomgate/modules/tor/current/tor/tor --version
 fi
+update_stage activate
 activation_started=1
 for unit in freedomgate.service freedomgate-network.service;do
  if [ "$(systemctl show "$unit" --property=LoadState --value)" != not-found ];then systemctl stop "$unit";fi
@@ -158,10 +170,12 @@ systemctl restart systemd-journald.service
 journalctl --flush
 systemctl enable freedomgate-network.service freedomgate.service
 # Helper upgrades require one deliberate restart to load the new code.
+update_stage restart
 if ! restart_gateway;then
  echo 'Service start failed; previous application restored when available.' >&2;exit 1
 fi
 # Probe HTTP without sourcing configuration as shell code.
+update_stage health
 if ! wait_for_admin;then
  echo 'HTTP readiness failed; previous application restored when available. Inspect journalctl -u freedomgate.' >&2;exit 1
 fi

@@ -7,7 +7,9 @@ import {isInteractive} from '../lib/interactions.js';
 export function useModuleManagement({api,status,dnsEngine,dnsFilter,tableLoading,can,run,t,active,userId}) {
 const zapretRuntime = ref(null), domainCatalog = ref(null);
 
-const moduleActionErrors=ref({});
+const moduleActionErrors=ref({}),updateClock=ref(Date.now());
+const updateClockTimer=setInterval(()=>{updateClock.value=Date.now();},1000);
+onUnmounted(()=>clearInterval(updateClockTimer));
 const moduleUpdates=ref([]),moduleServiceError=ref(''),moduleUpdateDialog=ref(null);
 const moduleWorking=computed(()=>moduleUpdates.value.some(row=>['checking','downloading','verifying','installing','restarting'].includes(row.state)));
 const releaseManaged=id=>id!=='system' && isReleaseManagedModule(id);
@@ -15,7 +17,9 @@ const updateFor=id=>moduleUpdates.value.find(row=>row.id===id);
 const moduleStateLabels={checking:'Проверка обновления…',available:'Доступно обновление',downloading:'Загрузка обновления…',verifying:'Проверка файлов…',installing:'Установка обновления…',restarting:'Перезапуск службы…',error:"Update failed"};
 function moduleVersionError(row){if(releaseManaged(row.id))return '';return moduleActionErrors.value[row.id] || updateFor(row.id)?.error;}
 function moduleVersionNote(row){if(row.id==='system' && updateFor('system')?.supported===false)return t('System updates require a native Linux installation. Rebuild the Docker image externally.');if(releaseManaged(row.id))return ''; if(moduleActionErrors.value[row.id])return t('Update failed');const update=updateFor(row.id);return moduleStateLabels[update?.state]?t(moduleStateLabels[update.state])+(update.state==='available' && update.candidate?.version?' · '+(row.id==='system'?update.candidate.version.slice(0,7):update.candidate.version):''):'';}
-function moduleProgress(row){const state=updateFor(row.id)?.state;return ['downloading','verifying','installing','restarting'].indexOf(state);}
+const systemStageLabels={source:'Downloading application source',archive:'Checking source archive',cache:'Checking installed modules',torDownload:'Downloading Tor through a gateway',dependencies:'Preparing system dependencies',runtime:'Preparing build tools',reuse:'Checking module reuse',tor:'Preparing Tor / Snowflake',lantern:'Preparing Lantern',outline:'Preparing Outline',backup:'Creating an installation backup',web:'Building the web interface',frp:'Preparing FRP',modules:'Preparing mihomo, Xray, AdGuard and zapret',package:'Preparing the new release',activate:'Activating the new release',restart:'Restarting services',health:'Checking system readiness'};
+function moduleProgress(row){const update=updateFor(row.id);if(!['downloading','verifying','installing','restarting'].includes(update?.state))return -1;return row.id==='system'&&Number.isFinite(update.progress)?update.progress:['downloading','verifying','installing','restarting'].indexOf(update.state)*25;}
+function moduleProgressDetail(row){const update=updateFor(row.id);if(row.id!=='system'||moduleProgress(row)<0)return '';const label=t(systemStageLabels[update.stage]||moduleStateLabels[update.state]);const action={reuse:'Using verified installed files',download:'Downloading component',build:'Building component'}[update.action];const elapsed=Math.max(0,Math.floor((updateClock.value-(update.startedAt||updateClock.value))/1000));return Math.round(moduleProgress(row))+'% · '+label+(action?' · '+t(action):'')+' · '+Math.floor(elapsed/60)+':'+String(elapsed%60).padStart(2,'0');}
 function moduleStatus(row){return row.status;}
 
 const moduleRows = computed(() => {
@@ -132,5 +136,5 @@ function reset(){
  moduleServiceError.value='';moduleUpdateDialog.value=null;moduleActionErrors.value={};
 }
 watch(userId,reset);
-return {moduleProgress,moduleRows,moduleServiceError,moduleWorking,moduleUpdateDialog,updateFor,moduleStatus,moduleVersionNote,moduleVersionError,moduleActions,checkUpdates,onModuleAction,onModuleRow,installModule,loadModuleStatus,reset};
+return {moduleProgressDetail,moduleProgress,moduleRows,moduleServiceError,moduleWorking,moduleUpdateDialog,updateFor,moduleStatus,moduleVersionNote,moduleVersionError,moduleActions,checkUpdates,onModuleAction,onModuleRow,installModule,loadModuleStatus,reset};
 }
