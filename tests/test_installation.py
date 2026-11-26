@@ -97,7 +97,7 @@ class Installation(unittest.TestCase):
         # A fresh Git checkout has no ignored Markdown documentation.
         shutil.rmtree(source/'docs')
         package.assemble(source,target)
-        self.assertTrue((target/'node_modules/yaml/dist/index.js').exists());self.assertTrue((target/'node_modules/yaml/LICENSE').exists())
+        self.assertEqual((target/'LICENSE').read_text(),'public');self.assertTrue((target/'node_modules/yaml/dist/index.js').exists());self.assertTrue((target/'node_modules/yaml/LICENSE').exists())
         self.assertFalse((target/'node_modules/not-runtime').exists())
         for module in ['outline','access-points','lantern','tor']:
             binary=source/'server'/module/'bin/linux-amd64/fixture';binary.parent.mkdir(parents=True,exist_ok=True);binary.write_text('BINARY-FIXTURE')

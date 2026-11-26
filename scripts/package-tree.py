@@ -3,7 +3,7 @@
 import argparse,json,pathlib,re,shutil
 from install_support import public_tree
 DIRECTORIES=['shared','server','packaging','docs','tests','.storybook']
-FILES=['package.json','package-lock.json','README.md','Dockerfile','compose.yaml','.dockerignore','install.sh']
+FILES=['package.json','package-lock.json','README.md','LICENSE','Dockerfile','compose.yaml','.dockerignore','install.sh']
 WEB=['src','public','dist','index.html','vite.config.js']
 # Explicit server imports only; yaml has no transitive runtime dependencies.
 RUNTIME_PACKAGES=['yaml']
