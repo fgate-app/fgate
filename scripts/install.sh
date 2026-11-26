@@ -112,6 +112,12 @@ if [ ! -c /dev/net/tun ];then modprobe tun;fi
 runtime=/opt/freedomgate/runtime
 install -d -m 0755 /opt/freedomgate "$runtime"
 update_stage runtime
+build_cache=/opt/freedomgate/build-cache
+install -d -m 0700 "$build_cache" "$build_cache/go" "$build_cache/go-mod" "$build_cache/go-build" "$build_cache/npm"
+# systemd jobs need explicit caches: a login HOME is not guaranteed.
+GOPATH="$build_cache/go";GOMODCACHE="$build_cache/go-mod";GOCACHE="$build_cache/go-build";npm_config_cache="$build_cache/npm"
+GOMAXPROCS=2;GOFLAGS='-p=2'
+export GOPATH GOMODCACHE GOCACHE npm_config_cache GOMAXPROCS GOFLAGS
 go_dir=$(ensure_runtime go)
 PATH="$go_dir/bin:$PATH";export PATH
 update_stage reuse

@@ -101,3 +101,7 @@ test('native install prepares upstream modules with pinned Go before runtime act
  const docker=readFileSync('Dockerfile','utf8');assert.ok(docker.includes('fetch-runtime.py go'));assert.ok(docker.includes('scripts/release-bundles.py --platform linux-${TARGETARCH} --prepare'));
 
 });
+
+ test('native installer configures persistent build caches without requiring a login HOME',()=>{
+ const script=readFileSync('scripts/install.sh','utf8');for(const name of ['GOPATH','GOMODCACHE','GOCACHE','npm_config_cache'])assert.match(script,new RegExp(name+'='));assert.match(script,/export GOPATH GOMODCACHE GOCACHE npm_config_cache/);
+ });
