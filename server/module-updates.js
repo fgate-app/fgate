@@ -36,6 +36,12 @@ export async function restoreModuleConfig(backup,path){
 }
 const moduleName=id=>({mihomo:'mihomo',xray:'Xray',adguard:'AdGuard Home',zapret:'zapret2',frp:'frp'}[id] || id);
 function failure(status,message){return Object.assign(new PublicError(message),{status});}
+// Use the same tracked operation as an individual check so status polling
+// cannot mistake an active batch check for a worker interrupted by restart.
+export async function checkAllModuleUpdates(system,modules){
+ if(system.supported){system.start('check');await system.task;}
+ modules.start('check');await modules.task;
+}
 export class ModuleUpdates {
  constructor({root='/opt/freedomgate/modules',state='/opt/freedomgate/module-updates',fetchImpl=fetch,healthFetch=fetch,execute=exec,install=null,restart=null,platform=process.platform,arch=process.arch}={}){
   Object.assign(this,{root,state,fetchImpl,healthFetch,execute,platform,arch});this.install=install || this.stage.bind(this);this.restart=restart || this.restartService.bind(this);this.rows={};this.task=null;this.interrupted=[];

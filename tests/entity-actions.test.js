@@ -4,7 +4,7 @@ import {gatewayActions,routeActions,clientActions,connectionGroupActions,moduleA
 const full={t:key=>key,can:()=>true},read={...full,can:()=>false},values=items=>items.map(item=>item.value);
 test('gateway map/table menus retain engine and builtin differences',()=>{
  assert.deepEqual(values(gatewayActions({engine:'direct'},full)),['routes','journal','diagnostics']);
- assert.deepEqual(values(gatewayActions({engine:'lantern',builtin:true},full)),['diagnostics','routes','journal']);
+ assert.deepEqual(values(gatewayActions({engine:'lantern',builtin:true},full)),['edit','diagnostics','routes','journal']);
  assert.deepEqual(values(gatewayActions({engine:'tor',builtin:true},full)),['edit','diagnostics','routes','journal']);
  const custom=gatewayActions({engine:'xray'},full);assert.equal(custom.at(-1).danger,true);
  assert.deepEqual(values(gatewayActions({engine:'xray'},read)),['routes','journal']);

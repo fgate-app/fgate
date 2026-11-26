@@ -96,7 +96,7 @@ export async function diagnoseDomains({domains,local=false,checks,profile,signal
      }
     },value=>{
      if(step.kind==='websites'){
-      target.path=value.path;target.limits=value.limits;target.attempts=value.attempts?.length?value.attempts:[{url,outcome:'unavailable',observation:value.reason || 'probe-unavailable',stages:[]}];
+      target.path=value.path;target.limits=value.limits;if(value.xrayConnection)target.xrayConnection=value.xrayConnection;target.attempts=value.attempts?.length?value.attempts:[{url,outcome:'unavailable',observation:value.reason || 'probe-unavailable',stages:[]}];
       report.path ||= value.path;report.attempts=report.targetReports.flatMap(row=>row.attempts);
       if(value.path?.configChanged){report.path.configChanged=true;}
      }else if(step.kind==='internet')target.uplinkControl={...value,mode:'direct-listener',verificationScope:'selected-listener-outbound'};

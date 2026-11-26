@@ -2512,5 +2512,12 @@
   "Component is ready": "组件已就绪",
   "Direct download": "直接下载",
   "Download through a gateway": "通过网关下载",
-  "Could not download Tor directly or through the available gateways.": "无法直接或通过可用网关下载 Tor。"
+  "Could not download Tor directly or through the available gateways.": "无法直接或通过可用网关下载 Tor。",
+  "Xray connection check": "Xray 连接检查",
+  "A separate Xray connection returned a verified secure website response.": "独立 Xray 连接收到了经过验证的网站安全响应。",
+  "Xray could not reach the server along the configured connection path.": "Xray 无法通过配置的连接路径访问服务器。",
+  "Xray reached the secure connection step, but TLS or REALITY verification failed.": "Xray 已进入安全连接阶段，但 TLS 或 REALITY 验证失败。",
+  "The Xray check did not collect enough evidence to identify the failed step.": "Xray 检查未收集到足够证据来确定故障阶段。",
+  "Check the proxy TLS or REALITY settings and the device clock.": "请检查代理的 TLS 或 REALITY 设置以及设备时间。",
+  "Check the server address, port and the selected outer gateway.": "请检查服务器地址、端口和所选外层网关。"
 }

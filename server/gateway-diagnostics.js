@@ -37,7 +37,7 @@ export function requestDiagnostic(endpoint,url,{signal,spawnProcess=spawn,localP
     child.on('close',code=>{if(done)return;try{finish(null,{...JSON.parse(Buffer.concat(chunks).toString()),exitCode:code});}catch{finish(Object.assign(Error('Invalid transport response.'),{code:'UNAVAILABLE'}));}});
     child.stdin.on('error',()=>{});
     if(signal?.aborted){abort();return;}
-    child.stdin.end(`proxy = "http://127.0.0.1:${endpoint.port}"\nproxy-user = ${JSON.stringify('fg-geo:'+endpoint.secret)}\nurl = ${JSON.stringify(url)}\n`);
+    child.stdin.end(`proxy = "${endpoint.type==='socks5'?'socks5h':'http'}://127.0.0.1:${endpoint.port}"\nproxy-user = ${JSON.stringify('fg-geo:'+endpoint.secret)}\nurl = ${JSON.stringify(url)}\n`);
   });
 }
 

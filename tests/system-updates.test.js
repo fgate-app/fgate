@@ -90,3 +90,21 @@ test('npm adapter restores the exact original lockfile and keeps integrity check
 test('component progress accepts only bounded module events',async()=>{
  const {componentProgress}=await import('../server/system-update-progress.js');assert.deepEqual(componentProgress('FG_MODULE_STAGE lantern building 35'),{id:'lantern',stage:'building',progress:35});assert.equal(componentProgress('FG_MODULE_STAGE shell building 35'),null);assert.equal(componentProgress('FG_MODULE_STAGE lantern building 101'),null);
 });
+
+
+test('global update check remains tracked while status polling recovers state',()=>fixture(async m=>{
+ const {checkAllModuleUpdates}=await import('../server/module-updates.js');
+ let release,started;const entered=new Promise(resolve=>{started=resolve;}),network=new Promise(resolve=>{release=resolve;});
+ m.fetchImpl=async()=>{started();await network;return new Response(JSON.stringify({sha:commit}));};
+ m.execute=async()=>{throw Error('No installer worker exists for a version check');};
+ let moduleChecks=0;const modules={start(op){assert.equal(op,'check');moduleChecks++;this.task=Promise.resolve();}};
+ const pending=checkAllModuleUpdates(m,modules);
+ try{await entered;assert.equal(m.snapshot().state,'checking');await m.recover();assert.equal(m.snapshot().state,'checking');assert.equal(m.snapshot().error,null);assert.equal(moduleChecks,0);assert.throws(()=>m.start('check'),/Wait/);}
+ finally{release();await pending;}
+ assert.equal(m.snapshot().state,'available');assert.equal(moduleChecks,1);assert.equal(m.busy,false);
+}));
+test('global update check skips unsupported system and still checks modules after source failure',()=>fixture(async m=>{
+ const {checkAllModuleUpdates}=await import('../server/module-updates.js');let checks=0;const modules={start(){checks++;this.task=Promise.resolve();}};
+ m.supported=false;await checkAllModuleUpdates(m,modules);assert.equal(checks,1);
+ m.supported=true;m.fetchImpl=async()=>{throw Error('Unavailable source');};await checkAllModuleUpdates(m,modules);assert.equal(checks,2);assert.equal(m.snapshot().state,'error');assert.equal(m.busy,false);
+}));

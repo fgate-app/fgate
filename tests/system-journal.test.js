@@ -38,3 +38,17 @@ test('journal reader failure is visible once and stopped monitor ignores late re
 test('journal retains only the recognised failed component and service, never raw failure text',()=>{
  const store=new Store(':memory:');new Auth(store.db);try{const entry={__CURSOR:'named',__REALTIME_TIMESTAMP:'1794768780000000',_SYSTEMD_UNIT:'freedomgate.service',MESSAGE:'FreedomGate startup: {"stage":"runtime","state":"failed","stageFailed":"adguard","secret":"private"}'};store.recordJournalEntry(entry,classifySystemEvent(entry));const event=store.events()[0];assert.deepEqual(JSON.parse(event.detail),{service:'freedomgate.service',stage:'adguard'});assert.ok(!JSON.stringify(event).includes('private'));}finally{store.close();}
 });
+
+test('a failure while reporting journal failure never rejects or logs private errors',async t=>{
+ const warnings=[];t.mock.method(console,'warn',message=>warnings.push(message));
+ const store=new Store(':memory:');store.recordEvent=()=>{throw Error('private database failure');};
+ const monitor=startSystemJournal(store,{interval:2147483647,read:async()=>{throw Error('private reader failure');}});
+ try{await new Promise(resolve=>setImmediate(resolve));await assert.doesNotReject(monitor.poll());assert.deepEqual(warnings,['FreedomGate: Could not persist system journal status.']);}finally{monitor.stop();store.close();}
+});
+
+test('database contention recognises extended SQLite codes without guessing from messages',async()=>{
+ const {isDatabaseBusy}=await import('../server/database.js');
+ for(const errcode of [5,6,517,262])assert.equal(isDatabaseBusy({errcode}),true);
+ for(const code of ['SQLITE_BUSY','SQLITE_LOCKED'])assert.equal(isDatabaseBusy({code}),true);
+ for(const value of [null,{},Error('database is locked'),{errcode:19},{errcode:'5'}])assert.equal(isDatabaseBusy(value),false);
+});

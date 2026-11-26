@@ -2395,5 +2395,12 @@
   "Component is ready": "Компонент готов",
   "Direct download": "Загрузка напрямую",
   "Download through a gateway": "Загрузка через шлюз",
-  "Could not download Tor directly or through the available gateways.": "Не удалось загрузить Tor напрямую и через доступные шлюзы."
+  "Could not download Tor directly or through the available gateways.": "Не удалось загрузить Tor напрямую и через доступные шлюзы.",
+  "Xray connection check": "Проверка подключения Xray",
+  "A separate Xray connection returned a verified secure website response.": "Отдельное подключение Xray получило проверенный защищённый ответ сайта.",
+  "Xray could not reach the server along the configured connection path.": "Xray не смог подключиться к серверу по настроенному пути соединения.",
+  "Xray reached the secure connection step, but TLS or REALITY verification failed.": "Xray дошёл до защищённого соединения, но проверка TLS или REALITY завершилась ошибкой.",
+  "The Xray check did not collect enough evidence to identify the failed step.": "Данных проверки Xray недостаточно, чтобы определить этап сбоя.",
+  "Check the proxy TLS or REALITY settings and the device clock.": "Проверьте настройки TLS или REALITY прокси и время на устройстве.",
+  "Check the server address, port and the selected outer gateway.": "Проверьте адрес и порт сервера, а также выбранный внешний шлюз."
 }

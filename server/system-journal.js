@@ -1,3 +1,4 @@
+import {isDatabaseBusy} from './database.js';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 const execute=promisify(execFile);
@@ -22,7 +23,7 @@ export function classifySystemEvent(entry) {
 }
 
 export function startSystemJournal(store,{read=execute,interval=5000}={}) {
- let stopped=false,busy=false,warned=false;
+ let stopped=false,busy=false,warned=false,persistenceWarned=false;
  async function poll(){
   if(stopped || busy)return;
   busy=true;
@@ -35,10 +36,18 @@ export function startSystemJournal(store,{read=execute,interval=5000}={}) {
     const entry=JSON.parse(line),event=classifySystemEvent(entry);
     store.recordJournalEntry(entry,event);
    }
-   warned=false;
+   warned=false;persistenceWarned=false;
   }catch(error){
-   if(!stopped && /(?:seek|cursor)/i.test(String(error.stderr || '')))store.db.prepare('DELETE FROM system_journal_state WHERE id=1').run();
-   if(!stopped && !warned){store.recordEvent('system','SYSTEM journal-unavailable',503);warned=true;}
+   // Keep the last committed cursor: the next poll retries the same entries.
+   // Never turn a temporary SQLite write lock into a journal-reader failure.
+   if(stopped || isDatabaseBusy(error))return;
+   try{
+    if(/(?:seek|cursor)/i.test(String(error.stderr || '')))store.db.prepare('DELETE FROM system_journal_state WHERE id=1').run();
+    if(!warned){store.recordEvent('system','SYSTEM journal-unavailable',503);warned=true;}
+   }catch(persistError){
+    // Failure reporting must not reject the timer's asynchronous callback.
+    if(!isDatabaseBusy(persistError) && !persistenceWarned){console.warn('FreedomGate: Could not persist system journal status.');persistenceWarned=true;}
+   }
   }finally{busy=false;}
  }
  const timer=setInterval(poll,interval);timer.unref();poll();

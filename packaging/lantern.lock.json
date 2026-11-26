@@ -1,5 +1,5 @@
 {
-  "version": "1.2.8-fg6",
+  "version": "1.2.8-fg7",
   "upstreamVersion": "1.2.8",
   "repository": "getlantern/lantern-headless-client",
   "sourceUrl": "https://codeload.github.com/getlantern/lantern-headless-client/tar.gz/v1.2.8",
@@ -9,9 +9,9 @@
   "routing": "proxy-only",
   "transport": "http-connect",
   "udp": false,
-  "upstreamTransport": "bound-uplink-tcp",
+  "upstreamTransport": "bound-uplink-or-socks5-tcp",
   "modifiedSource": {
-    "path": "server/lantern/source/1.2.8-fg6.tar.gz",
-    "sha256": "33c6b9a4bc482b88c07692a6a71d2e8f15d9e76c6f46c1b892dc46750f9512c8"
+    "path": "server/lantern/source/1.2.8-fg7.tar.gz",
+    "sha256": "b685c4f1659039620fa475a6e59dc6dba847be553395e98f5925a4f47e002f50"
   }
 }

@@ -23,7 +23,7 @@ import {sniTargets} from '../server/sni-diagnostics.js';
 import {dnsMatrixProviders,normalizeDnsMatrixName} from '../server/dns-matrix-catalog.js';
 import {replaceDhcpConfig} from '../server/dhcp-config.js';
 import {outlineDpiArgs,outlineDpiNft,OUTLINE_DPI_TABLE,OUTLINE_DPI_PRIORITY} from '../server/outline-dpi.js';
-import {ModuleUpdates} from '../server/module-updates.js';
+import {ModuleUpdates,checkAllModuleUpdates} from '../server/module-updates.js';
 import {SystemUpdates} from '../server/system-updates.js';
 import { serveHelperConnection } from '../server/helper-protocol.js';
 import { createServer } from 'node:net';
@@ -509,7 +509,7 @@ async function handle(request, {signal} = {}) {
   if(request.action==='diagnostic-strategy'){if(request.op==='start' && strategyQueue===ZAPRET_QNUM)return {ok:false,reason:'diagnostic-queue-unavailable'};return strategyDiagnostics.handle(request,{signal,interface:current?.uplink});}
   if(request?.action==='modules'){
     if(request.op!=='status' && !moduleUpdates.task)moduleDownloadGateways=validDownloadGateways(request.gateways);
-    try{if(request.op==='status'){await systemUpdates.recover();return {ok:true,modules:[...moduleUpdates.snapshot(),systemUpdates.snapshot()]};}if(moduleBatchTask||moduleUpdates.task||systemUpdates.busy)throw Object.assign(fail('Wait for the current update to finish.'),{status:409});if(request.op==='check' && request.id===undefined){moduleBatchTask=(async()=>{if(systemUpdates.supported)await systemUpdates.check();moduleUpdates.start('check');await moduleUpdates.task;})().catch(()=>systemUpdates.set({state:'error',error:'Could not check for system updates.'}).catch(()=>{})).finally(()=>{moduleBatchTask=null;});return {ok:true,accepted:true};}if(request.id==='system')return systemUpdates.start(request.op,request.version);return moduleUpdates.start(request.op,request.id,request.version);}
+    try{if(request.op==='status'){await systemUpdates.recover();return {ok:true,modules:[...moduleUpdates.snapshot(),systemUpdates.snapshot()]};}if(moduleBatchTask||moduleUpdates.task||systemUpdates.busy)throw Object.assign(fail('Wait for the current update to finish.'),{status:409});if(request.op==='check' && request.id===undefined){moduleBatchTask=checkAllModuleUpdates(systemUpdates,moduleUpdates).catch(()=>systemUpdates.set({state:'error',error:'Could not check for system updates.'}).catch(()=>{})).finally(()=>{moduleBatchTask=null;});return {ok:true,accepted:true};}if(request.id==='system')return systemUpdates.start(request.op,request.version);return moduleUpdates.start(request.op,request.id,request.version);}
     catch(error){return {ok:false,status:error.status || 500,error:error.message};}
   }
   const action = String(request?.action || '');

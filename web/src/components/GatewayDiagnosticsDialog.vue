@@ -139,7 +139,7 @@ function returnToSettings(){stop();report.value=null;progress.value=null;error.v
       <details v-for="card in group.cards" :key="card.id" class="diagnostic-finding" :data-state="card.state" :data-testid="'diagnostic-finding-'+card.id">
        <summary><AppIcon class="diagnostic-finding-icon" :name="['failed','partial'].includes(card.state)?'close':'check'" /><span>{{t(card.title)}}</span><span class="diagnostic-muted diagnostic-result-state">{{t(card.statusMessage || findingStates[card.state] || findingStates.unavailable)}}<AppIcon name="chevron" /></span></summary>
        <div class="diagnostic-detail">
-        <p v-if="card.description">{{t(card.description)}}</p><p>{{t(card.message,card.params)}}</p>
+        <p v-if="card.description">{{t(card.description)}}</p><p>{{t(card.message,card.params)}}</p><p v-if="card.next && card.id.startsWith('xray-connection')">{{t(card.next)}}</p>
         <dl v-if="card.rows?.length" class="diagnostic-list"><div v-for="(row,index) in card.rows" :key="index" class="diagnostic-check"><dt>{{row.label?t(row.label):row.target}}<template v-if="row.operation"> · {{t(row.operation)}}</template></dt><dd>{{t(row.message,row.params)}}<p v-for="(detail,detailIndex) in row.details" :key="detailIndex">{{t(detail.message,detail.params)}}</p><p v-if="row.redirects" class="diagnostic-muted">{{t('Redirects: {chain}',{chain:row.redirects})}}</p></dd></div></dl>
        </div>
       </details>

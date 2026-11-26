@@ -2395,5 +2395,12 @@
   "Component is ready": "Component is ready",
   "Direct download": "Direct download",
   "Download through a gateway": "Download through a gateway",
-  "Could not download Tor directly or through the available gateways.": "Could not download Tor directly or through the available gateways."
+  "Could not download Tor directly or through the available gateways.": "Could not download Tor directly or through the available gateways.",
+  "Xray connection check": "Xray connection check",
+  "A separate Xray connection returned a verified secure website response.": "A separate Xray connection returned a verified secure website response.",
+  "Xray could not reach the server along the configured connection path.": "Xray could not reach the server along the configured connection path.",
+  "Xray reached the secure connection step, but TLS or REALITY verification failed.": "Xray reached the secure connection step, but TLS or REALITY verification failed.",
+  "The Xray check did not collect enough evidence to identify the failed step.": "The Xray check did not collect enough evidence to identify the failed step.",
+  "Check the proxy TLS or REALITY settings and the device clock.": "Check the proxy TLS or REALITY settings and the device clock.",
+  "Check the server address, port and the selected outer gateway.": "Check the server address, port and the selected outer gateway."
 }

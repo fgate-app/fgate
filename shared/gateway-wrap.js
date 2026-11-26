@@ -21,7 +21,6 @@ export function gatewayChainAvailable(profiles,id){
 export function validateGatewayWrap(profiles,id,gatewayId){
  if(gatewayId!==null && (typeof gatewayId!=='string' || !gatewayId))throw Error("Select an outer gateway.");
  if(gatewayId===null)return;
- if(profiles.find(p=>p.id===id)?.engine==='lantern')throw Error('Lantern cannot be wrapped in another gateway.');
  if(profiles.find(p=>p.id===id)?.engine==='tor' || !canWrapGateway(profiles.find(p=>p.id===id)))throw Error("This connection cannot be wrapped in a gateway.");
  if(gatewayUsesLantern(profiles,gatewayId) && ['wireguard','hysteria2','hysteria','tuic','shadowquic','masque','tailscale','zerotier','easytier'].includes(profiles.find(row=>row.id===id)?.protocol))throw Error('This UDP-only proxy cannot use a TCP-only gateway.');
  if(gatewayUsesTor(profiles,gatewayId) && ['wireguard','hysteria2','hysteria','tuic','shadowquic','masque','tailscale','zerotier','easytier'].includes(profiles.find(row=>row.id===id)?.protocol))throw Error('This UDP-only proxy cannot use a Tor gateway.');

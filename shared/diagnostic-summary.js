@@ -54,6 +54,9 @@ export function diagnosticSummary(report,{providers=[]}={}){
     message:webState==='ok'?'The checked websites opened through this connection.':webState==='partial'?(websites.some(row=>row.state==='failed')?'Some websites opened and others failed. The connection works for part of the checked traffic.':'Some websites opened. Other website checks could not be completed.'):webState==='failed'?'None of the checked websites opened. See the failed step below.':'There is not enough verified information to assess this connection.',
     rows:websites});
   if(report.path?.configChanged)add({id:'configuration',title:'Connection settings',state:'unavailable',message:'The settings changed during the test. Run diagnostics again before using these results.',next:actions.repeat});
+  if(report.xrayConnection){const xray=report.xrayConnection;add({id:'xray-connection',title:'Xray connection check',state:xray.state,
+    message:({'secure-response':'A separate Xray connection returned a verified secure website response.','server-connect-failed':'Xray could not reach the server along the configured connection path.','secure-handshake-failed':'Xray reached the secure connection step, but TLS or REALITY verification failed.','configuration-changed':'The settings changed during the test. Run diagnostics again before using these results.'})[xray.reason] || 'The Xray check did not collect enough evidence to identify the failed step.',
+    next:xray.reason==='secure-handshake-failed'?'Check the proxy TLS or REALITY settings and the device clock.':xray.reason==='server-connect-failed'?'Check the server address, port and the selected outer gateway.':undefined});}
   const endpoint=report.endpointControl;
   if(!local && endpoint){
     const bootstrap=endpoint.bootstrap;

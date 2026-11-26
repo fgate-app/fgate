@@ -1,12 +1,12 @@
 // Explicit root-only native probe. Credentials and the copied identity stay on-host.
-import {writeFileSync,mkdtempSync,mkdirSync,cpSync,rmSync} from 'node:fs';
+import {writeFileSync,mkdtempSync,mkdirSync,cpSync,rmSync,existsSync} from 'node:fs';
 import {execFileSync,spawn} from 'node:child_process';import {createInterface} from 'node:readline';import {join} from 'node:path';import assert from 'node:assert/strict';
 assert.equal(process.getuid(),0,'Run this explicit native integration probe as root');
 const root=process.env.FG_CODE_ROOT,report={phases:[]},work=mkdtempSync('/var/lib/freedomgate/.lantern-uplink-');let child;
 async function cleanup(){if(child)try{execFileSync('systemctl',['stop','freedomgate-lantern-lab-'+process.pid],{stdio:'ignore',timeout:10000});}catch{}child?.kill('SIGTERM');rmSync(work,{recursive:true,force:true});}
 for(const signal of ['SIGINT','SIGTERM'])process.once(signal,async()=>{await cleanup();process.exit(143);});
 try{
- mkdirSync(join(work,'state/lantern'),{recursive:true});cpSync('/var/lib/freedomgate/lantern/data',join(work,'state/lantern/data'),{recursive:true,filter:path=>!/(^|\/)logs?(\/|$)|\.log(?:\.\d+)?$/.test(path)});
+ mkdirSync(join(work,'state/lantern/data'),{recursive:true});if(existsSync('/var/lib/freedomgate/lantern/data'))cpSync('/var/lib/freedomgate/lantern/data',join(work,'state/lantern/data'),{recursive:true,filter:path=>!/(^|\/)logs?(\/|$)|\.log(?:\.\d+)?$/.test(path)});
  cpSync(join(root,'tests/integration/lantern-live-probe.mjs'),join(work,'probe.mjs'));execFileSync('chown',['-R','freedomgate:freedomgate',work]);
  child=spawn('systemd-run',['--unit=freedomgate-lantern-lab-'+process.pid,'--wait','--pipe','--collect','-p','User=freedomgate','-p','Group=freedomgate','-p','AmbientCapabilities=CAP_NET_RAW','-p','CapabilityBoundingSet=CAP_NET_RAW','-p','NoNewPrivileges=yes','--setenv=FG_CODE_ROOT='+root,'--setenv=FG_STATE='+join(work,'state'),'--setenv=FG_LANTERN_BINARY='+process.env.FG_LANTERN_BINARY,'/opt/freedomgate/runtime/node/bin/node',join(work,'probe.mjs')],{stdio:['pipe','pipe','pipe']});child.stderr.resume();
  const queue=[],waiters=[];createInterface({input:child.stdout}).on('line',line=>{const value=JSON.parse(line);if(waiters.length)waiters.shift()(value);else queue.push(value);});

@@ -47,7 +47,7 @@ watch(()=>props.open,async open=>{
  if(!open){picking.value=false;draft.value={};return;}
  dpiBypass.value=props.profile?.dpiBypass===true;gatewayId.value=props.profile?.gatewayId || '';wrapEnabled.value=!!gatewayId.value;
  name.value=props.profile?.name || '';nameEdited.value=false;enabled.value=props.profile?.enabled!==false;value.value='';mode.value=props.profile||props.initialType?'manual':'config';type.value=proxyTypes.some(option=>option.value===props.initialType)?props.initialType:'vless';resetDraft();fileValue.value='';selectedFile.value=null;reading.value=false;records.value=[];selected.value=[];
- if(props.profile && !props.profile.builtin){
+ if(props.profile && (!props.profile.builtin || props.profile.engine==='lantern')){
   loading.value=true;
   try{const data=await props.loadConfig(props.profile.id);if(generation!==fileGeneration.value)return;type.value=data.type;draft.value={...data.fields};dpiBypass.value=data.dpiBypass===true;gatewayId.value=data.gatewayId || '';wrapEnabled.value=!!gatewayId.value;loaded.value=true;}
   catch(e){if(generation===fileGeneration.value){reportError(e.message);mode.value='config';}}
@@ -80,7 +80,7 @@ function addSelected(){try{if(props.disabled || !selected.value.length)return;co
 <template>
  <AppDialog :form-session="open" :form-state="loading?undefined:[enabled,name,value,dpiBypass,wrapEnabled,gatewayId,type,draft,fileValue]" :open="open && !picking" :title="t(profile?'Изменить подключение':'Новая точка выхода')" @close="emit('close')">
   <div class="form-section gateway-form">
-   <label>{{t('Название')}}<AppInput :model-value="name" maxlength="100" :placeholder="t('Необязательно')" @update:model-value="editName" /></label>
+   <label>{{t('Название')}}<AppInput :model-value="name" :disabled="!!profile?.builtin" maxlength="100" :placeholder="t('Необязательно')" @update:model-value="editName" /></label>
    <AppSwitch v-if="profile" v-model="enabled" :label="t('Включено')" />
    <AppSwitch v-if="profile?.engine==='outline' && loaded" v-model="dpiBypass" :label="t('Обход DPI')" :disabled="disabled" data-testid="ss-dpi-bypass" />
    <AppSwitch v-if="wrapping && loaded" v-model="wrapEnabled" :label="t('Завернуть в шлюз')" :disabled="disabled" data-testid="gateway-wrap" />

@@ -11,8 +11,8 @@ export async function unusedPort(){const server=net.createServer();await new Pro
 function listening(port){return new Promise(resolve=>{const socket=net.connect({host:'127.0.0.1',port,timeout:200});const done=ok=>{socket.destroy();resolve(ok);};socket.once('connect',()=>done(true));socket.once('error',()=>done(false));socket.once('timeout',()=>done(false));});}
 
 export class XraySupervisor {
- constructor({binary=process.env.FREEDOMGATE_XRAY || moduleBinary('xray','xray','/opt/freedomgate/modules/xray/v26.10.31/xray'),stateDir=process.env.FREEDOMGATE_STATE_DIR || '/var/lib/freedomgate',resolve=lookup}={}){
-  this.binary=binary;this.dir=join(stateDir,'xray');this.entries=new Map();this.resolve=resolve;
+ constructor({binary=process.env.FREEDOMGATE_XRAY || moduleBinary('xray','xray','/opt/freedomgate/modules/xray/v26.10.31/xray'),stateDir=process.env.FREEDOMGATE_STATE_DIR || '/var/lib/freedomgate',resolve=lookup,diagnosticLog=null}={}){
+  this.binary=binary;this.dir=join(stateDir,'xray');this.entries=new Map();this.resolve=resolve;this.diagnosticLog=diagnosticLog;
  }
  status(){return {state:!existsSync(this.binary)?'unavailable':[...this.entries.values()].some(entry=>!entry.process)?'error':this.entries.size?'running':'stopped',running:this.entries.size,ready:[...this.entries.values()].filter(entry=>entry.process).length};}
  async prepare(configs){
@@ -39,7 +39,7 @@ export class XraySupervisor {
      entry={id:row.profile_id,hash,port,folder,path:join(folder,'config.json'),address,process:null,timer:null,stopping:false,retries:0};
      created.push(entry);
      if(row.wrapEndpoint)outbound.streamSettings.sockopt={dialerProxy:'gateway-wrapper'};
-     const managed={log:{loglevel:'error'},inbounds:[{tag:'local',listen:'127.0.0.1',port,protocol:'socks',settings:{auth:'noauth',udp:true}}],outbounds:[{...outbound,tag:'vpn'},...(row.wrapEndpoint?[{tag:'gateway-wrapper',protocol:'socks',settings:{servers:[{address:'127.0.0.1',port:row.wrapEndpoint.port,users:[{user:row.wrapEndpoint.username,pass:row.wrapEndpoint.password}]}]}}]:[])],routing:{rules:[{type:'field',inboundTag:['local'],outboundTag:'vpn'}]}};
+     const managed={log:{loglevel:this.diagnosticLog?'info':'error'},inbounds:[{tag:'local',listen:'127.0.0.1',port,protocol:'socks',settings:{auth:'noauth',udp:true}}],outbounds:[{...outbound,tag:'vpn'},...(row.wrapEndpoint?[{tag:'gateway-wrapper',protocol:'socks',settings:{servers:[{address:'127.0.0.1',port:row.wrapEndpoint.port,users:[{user:row.wrapEndpoint.username,pass:row.wrapEndpoint.password}]}]}}]:[])],routing:{rules:[{type:'field',inboundTag:['local'],outboundTag:'vpn'}]}};
      writeFileSync(entry.path,JSON.stringify(managed),{mode:0o600});
      await this.validate(entry.path);this.start(entry);await this.ready(entry);
     }
@@ -61,8 +61,15 @@ export class XraySupervisor {
  });}
  command(entry){return ['run','-config',entry.path];}
  start(entry){
-  const fd=openSync(join(entry.folder,this.logName || 'xray.log'),'a',0o600);
-  const child=spawn(this.binary,this.command(entry),{stdio:['ignore',fd,fd]});closeSync(fd);entry.process=child;
+  let child;
+  if(this.diagnosticLog){
+   child=spawn(this.binary,this.command(entry),{stdio:['ignore','pipe','pipe']});
+   child.stdout.on('data',this.diagnosticLog);child.stderr.on('data',this.diagnosticLog);
+  }else{
+   const fd=openSync(join(entry.folder,this.logName || 'xray.log'),'a',0o600);
+   try{child=spawn(this.binary,this.command(entry),{stdio:['ignore',fd,fd]});}finally{closeSync(fd);}
+  }
+  entry.process=child;
   const exited=()=>{
    if(entry.process!==child)return;entry.process=null;
    this.scheduleRestart(entry);

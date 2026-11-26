@@ -26,20 +26,24 @@ export async function lanternUplink(){
  throw Error('Lantern uplink interface is unavailable.');
 }
 export class LanternGateway{
- constructor({id,stateDir,binary=lanternBinary(),spawnProcess=spawn,verify=verifyLantern,resolveInterface=lanternUplink}={}){Object.assign(this,{id,dir:join(stateDir,'lantern','data'),binary,spawnProcess,verify,resolveInterface});this.state='stopped';this.sockets=new Set();this.child=null;this.gate=null;this.startedAt=null;this.stopped=false;}
+ constructor({id,stateDir,binary=lanternBinary(),spawnProcess=spawn,verify=verifyLantern,resolveInterface=lanternUplink,wrapEndpoint=null}={}){Object.assign(this,{id,dir:join(stateDir,'lantern','data'),binary,spawnProcess,verify,resolveInterface,wrapEndpoint});this.state='stopped';this.sockets=new Set();this.child=null;this.gate=null;this.startedAt=null;this.stopped=false;}
  snapshot(){return {state:this.state,startedAt:this.startedAt,mode:'proxy-only',udp:false};}
- async start(){
-  this.verify(this.binary);const interfaceName=await this.resolveInterface();mkdirSync(this.dir,{recursive:true,mode:0o700});const upstreamPort=await unusedPort();
+ async start({deferLaunch=false}={}){
+  this.verify(this.binary);this.interfaceName=this.wrapEndpoint?'':await this.resolveInterface();mkdirSync(this.dir,{recursive:true,mode:0o700});const upstreamPort=await unusedPort();this.upstreamPort=upstreamPort;
   this.gate=net.createServer(client=>{
    if(this.state!=='running' || this.stopped){client.destroy();return;}
    const upstream=net.connect(upstreamPort,'127.0.0.1');this.sockets.add(client);this.sockets.add(upstream);
    const close=()=>{client.destroy();upstream.destroy();this.sockets.delete(client);this.sockets.delete(upstream);};client.on('error',close);upstream.on('error',close);client.on('close',close);upstream.on('close',close);upstream.pipe(client);client.pipe(upstream);
   });
   await new Promise((resolve,reject)=>{this.gate.once('error',reject);this.gate.listen(0,'127.0.0.1',resolve);});this.port=this.gate.address().port;this.state='connecting';this.startedAt=new Date().toISOString();
-  let buffer='';this.child=this.spawnProcess(this.binary,['--data-path',this.dir,'--raw','start','--http-proxy-addr','127.0.0.1:'+upstreamPort,'--socks-proxy-addr','127.0.0.1:0'],{stdio:['ignore','pipe','pipe'],env:{...process.env,FG_LANTERN_INTERFACE:interfaceName}});
-  const fail=()=>{if(!this.stopped)this.state='error';this.drop();};this.child.once('error',fail);this.child.once('exit',fail);this.child.stderr.resume();
+  if(!deferLaunch)this.activate();return this;
+ }
+ activate(){
+  if(this.child || this.stopped)return;
+  const fail=()=>{if(!this.stopped)this.state='error';this.drop();};
+  let buffer='';try{this.child=this.spawnProcess(this.binary,['--data-path',this.dir,'--raw','start','--http-proxy-addr','127.0.0.1:'+this.upstreamPort,'--socks-proxy-addr','127.0.0.1:0'],{stdio:['ignore','pipe','pipe'],env:{...process.env,FG_LANTERN_INTERFACE:this.interfaceName,FG_LANTERN_UPSTREAM:this.wrapEndpoint?JSON.stringify({port:this.wrapEndpoint.port,username:this.wrapEndpoint.username,password:this.wrapEndpoint.password}):''}});}catch{fail();return;}
+  this.child.once('error',fail);this.child.once('exit',fail);this.child.stderr.resume();
   this.child.stdout.on('data',data=>{buffer=(buffer+data.toString()).slice(-8192);if(!this.stopped && this.child.exitCode==null && this.child.signalCode==null && buffer.includes('Proxy is ready to receive connections'))this.state='running';});
-  return this;
  }
  drop(){for(const socket of this.sockets)socket.destroy();this.sockets.clear();}
  async stop(){this.stopped=true;this.state='stopped';this.drop();await stopManagedProcess(this.child);if(this.gate)await new Promise(resolve=>this.gate.close(resolve));}
@@ -50,9 +54,9 @@ export class LanternSupervisor{
  status(){return Object.fromEntries([...this.entries].map(([id,row])=>[id,row.snapshot()]));}
  async prepare(configs){
   if(this.pending)throw Error('A Lantern configuration update is already pending.');this.pending=true;const rows=configs.filter(row=>row.engine==='lantern'),created=[],next=new Map();
-  try{if(rows.length>1)throw Error('Only one Lantern gateway is supported.');for(const config of rows){let row=this.entries.get(config.profile_id);if(!row){if(this.entries.size)throw Error('Stop the previous Lantern gateway before creating another one.');row=this.create({id:config.profile_id,stateDir:this.stateDir});created.push(row);await row.start();}next.set(config.profile_id,row);}}
+  try{if(rows.length>1)throw Error('Only one Lantern gateway is supported.');for(const config of rows){const key=JSON.stringify(config.wrapEndpoint || null);let row=this.entries.get(config.profile_id);if(!row || row.key!==key){if(this.entries.size && !this.entries.has(config.profile_id))throw Error('Stop the previous Lantern gateway before creating another one.');const stateDir=config.wrapEndpoint?join(this.stateDir,'lantern-runs',createHash('sha256').update(config.profile_id+'\0'+(config.wrapEndpoint.key || key)).digest('hex').slice(0,24)):this.stateDir;row=this.create({id:config.profile_id,stateDir,wrapEndpoint:config.wrapEndpoint || null});row.key=key;created.push(row);await row.start({deferLaunch:true});}next.set(config.profile_id,row);}}
   catch(error){await Promise.allSettled(created.map(row=>row.stop()));this.pending=false;throw error;}
-  let settled=false;return {bridges:Object.fromEntries([...next].map(([id,row])=>[id,{address:'127.0.0.1',port:row.port,udp:false,type:'http'}])),commit:async()=>{if(settled)return;settled=true;try{const old=this.entries;this.entries=next;await Promise.all([...old].filter(([id])=>!next.has(id)).map(([,row])=>row.stop()));}finally{this.pending=false;}},rollback:async()=>{if(settled)return;settled=true;try{await Promise.all(created.map(row=>row.stop()));}finally{this.pending=false;}}};
+  let settled=false;return {bridges:Object.fromEntries([...next].map(([id,row])=>[id,{address:'127.0.0.1',port:row.port,udp:false,type:'http'}])),commit:async()=>{if(settled)return;settled=true;try{const old=this.entries;this.entries=next;for(const row of created)row.activate?.();await Promise.all([...old].filter(([id,row])=>next.get(id)!==row).map(([,row])=>row.stop()));}finally{this.pending=false;}},rollback:async()=>{if(settled)return;settled=true;try{await Promise.all(created.map(row=>row.stop()));}finally{this.pending=false;}}};
  }
  async stop(){const entries=this.entries;this.entries=new Map();await Promise.all([...entries.values()].map(row=>row.stop()));}
 }

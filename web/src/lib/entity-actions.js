@@ -4,7 +4,7 @@ export function gatewayActions(profile,{t,can}){
  const journal={value:'journal',label:t('Показать соединения')};
  if(!can('profiles:write'))return [{value:'routes',label:t('Перейти к маршрутам')},journal];
  if(profile.engine==='direct')return [{value:'routes',label:t('Перейти к маршрутам')},journal,{value:'diagnostics',label:t('Диагностика шлюза')}];
- return [...(profile.engine==='lantern'?[]:[{value:'edit',label:t('Настроить')}]),...(profile.subscriptionId?[{value:'subscription-refresh',label:t('Update from subscription')}]:[]),{value:'diagnostics',label:t('Диагностика шлюза')},{value:'routes',label:t('Перейти к маршрутам')},journal,...(!profile.builtin?[{value:'delete',label:t('Удалить'),danger:true}]:[])];
+ return [{value:'edit',label:t('Настроить')},...(profile.subscriptionId?[{value:'subscription-refresh',label:t('Update from subscription')}]:[]),{value:'diagnostics',label:t('Диагностика шлюза')},{value:'routes',label:t('Перейти к маршрутам')},journal,...(!profile.builtin?[{value:'delete',label:t('Удалить'),danger:true}]:[])];
 }
 export function routeActions(route,{t,can}){
  if(route?.system)return [{value:'dns',label:t('Настройки DNS')}];

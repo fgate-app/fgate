@@ -11,7 +11,8 @@ function paths(out){
  return {...xpaths,sni:['streamSettings',security,'serverName'],fingerprint:['streamSettings',security,'fingerprint'],publicKey:['streamSettings','realitySettings','publicKey'],shortId:['streamSettings','realitySettings','shortId'],path:['streamSettings',transport,'path'],host:['streamSettings',transport,...(transport==='wsSettings'?['headers','Host']:['host'])],serviceName:['streamSettings','grpcSettings','serviceName']};
 }
 export function gatewayEditor(snapshot){
- const row=snapshot?.config;if(!row || snapshot.profile.builtin && row.engine!=='tor')throw new Error("The configuration is not available for editing.");
+ const row=snapshot?.config;if(!row || snapshot.profile.builtin && !['tor','lantern'].includes(row.engine))throw new Error("The configuration is not available for editing.");
+ if(row.engine==='lantern')return {type:'lantern',fields:{},gatewayId:snapshot.profile.gateway_id || snapshot.profile.gatewayId || null};
  if(row.engine==='tor')return {type:'tor',settings:normalizeTorSettings(JSON.parse(row.config))};
  let type,fields={};
  if(row.engine==='xray'){

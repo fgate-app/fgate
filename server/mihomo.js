@@ -1,3 +1,4 @@
+import {diagnoseXrayConnection} from './xray-diagnostics.js';
 import {expandConnectionGroup} from '../shared/connection-groups.js';
 import {releaseModule} from './release-modules.js';
 import {LanternSupervisor,lanternBinary} from './lantern/runtime.js';
@@ -166,7 +167,7 @@ export function buildMihomoConfig(settings, { mixedPort = 7890, dnsPort = 15353,
   const rules = [];
 
   const ruleOwners=[];
-  if(lanternConfigured){rules.push('  - PROCESS-NAME,lantern-headless,DIRECT','  - PROCESS-NAME,lantern-headles,DIRECT');ruleOwners.push(null,null);}
+  if(lanternConfigured){const lantern=routes.profiles.find(profile=>profile.engine==='lantern' && gatewayChainAvailable(routes.profiles,profile.id)),target=lantern.gatewayId?destination(lantern.gatewayId):'DIRECT';for(const name of ['lantern-headless','lantern-headles']){if(lantern.gatewayId){rules.push(`  - AND,((PROCESS-NAME,${name}),(NETWORK,udp)),REJECT`);ruleOwners.push(null);}rules.push(`  - PROCESS-NAME,${name},${target}`);ruleOwners.push(null);}}
   if(torConfigured){rules.push('  - PROCESS-NAME,tor,DIRECT','  - PROCESS-NAME,lyrebird,DIRECT');ruleOwners.push(null,null);}
   if(remoteAccessEnabled){for(const subnet of privateNetworks){rules.push(`  - AND,((IN-NAME,fg-remote),(IP-CIDR${subnet.includes(':')?'6':''},${subnet})),REJECT`);ruleOwners.push(null);}}
   for (const group of [...routes.groups.filter(group=>(group.routeId || group.route_id)==='block'),...routes.groups.filter(group=>(group.routeId || group.route_id)!=='block').reverse()]) {
@@ -455,9 +456,15 @@ export class MihomoSupervisor {
 
   async diagnoseGateway(id,{signal,targets}={}){
     if(this.state!=='running')throw Error('The engine is unavailable.');
-    const endpoint=this.locationEndpoints.get(id);
+    const endpoint=this.locationEndpoints.get(id),fingerprint=gatewayFingerprint(this._routes.profiles || [],this._routes.configs || [],id);
     const report=await diagnoseGateway({id,profiles:this._routes.profiles || [],endpoint,signal,targets,
       observe:context=>observeDiagnostic((path,options)=>this.controller(path,options),context)});
+    const selected=this._routes.profiles.find(profile=>profile.id===id);
+    if(selected?.engine==='xray' && report.attempts?.length){
+      const config=this._routes.configs.find(row=>row.profile_id===id),wrap=selected.gatewayId?this.wrapperEndpoints.get(selected.gatewayId):null;
+      if(selected.gatewayId && !wrap)report.xrayConnection={state:'unavailable',reason:'insufficient-evidence',events:[],scope:'isolated-xray-connection'};
+      else if(config)report.xrayConnection=await diagnoseXrayConnection({row:{...config,...(wrap?{wrapEndpoint:{...wrap,remoteDns:gatewayUsesTcpOnly(this._routes.profiles,selected.gatewayId)}}:{})},binary:this.xray.binary,target:report.attempts[0].url,signal});
+    }
     const outer=report.path.chain.at(-1);
     if(outer && !['direct','zapret'].includes(outer.engine))report.path.externalConnection={state:'unavailable',reason:'peer-not-observable'};
     if(!signal?.aborted && outer && !['direct','zapret'].includes(outer.engine)){
@@ -469,8 +476,9 @@ export class MihomoSupervisor {
         if(net.isIP(address) && pid)report.path.externalConnection=await observeGatewaySocket({signal,pid,address,port:Number(fields.port),...await managedSocketIdentity(pid)});
       }catch{report.path.externalConnection={state:'unavailable',reason:'socket-evidence-unavailable'};}
     }
-    if(this.locationEndpoints.get(id)!==endpoint){
+    if(this.locationEndpoints.get(id)!==endpoint || gatewayFingerprint(this._routes.profiles || [],this._routes.configs || [],id)!==fingerprint){
       report.path.configChanged=true;report.path.engineVerified=false;
+      if(report.xrayConnection)report.xrayConnection={state:'unavailable',reason:'configuration-changed',events:[],scope:'isolated-xray-connection'};
       report.path.externalConnection={state:'unavailable',reason:'configuration-changed'};
     }
     return report;
