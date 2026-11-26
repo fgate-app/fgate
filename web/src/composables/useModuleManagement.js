@@ -10,10 +10,11 @@ const zapretRuntime = ref(null), domainCatalog = ref(null);
 const moduleActionErrors=ref({});
 const moduleUpdates=ref([]),moduleServiceError=ref(''),moduleUpdateDialog=ref(null);
 const moduleWorking=computed(()=>moduleUpdates.value.some(row=>['checking','downloading','verifying','installing','restarting'].includes(row.state)));
+const releaseManaged=id=>id!=='system' && isReleaseManagedModule(id);
 const updateFor=id=>moduleUpdates.value.find(row=>row.id===id);
 const moduleStateLabels={checking:'Проверка обновления…',available:'Доступно обновление',downloading:'Загрузка обновления…',verifying:'Проверка файлов…',installing:'Установка обновления…',restarting:'Перезапуск службы…',error:"Update failed"};
-function moduleVersionError(row){if(isReleaseManagedModule(row.id))return '';return moduleActionErrors.value[row.id] || updateFor(row.id)?.error;}
-function moduleVersionNote(row){if(isReleaseManagedModule(row.id))return ''; if(moduleActionErrors.value[row.id])return t('Update failed');const update=updateFor(row.id);return moduleStateLabels[update?.state]?t(moduleStateLabels[update.state])+(update.state==='available' && update.candidate?.version?' · '+update.candidate.version:''):'';}
+function moduleVersionError(row){if(releaseManaged(row.id))return '';return moduleActionErrors.value[row.id] || updateFor(row.id)?.error;}
+function moduleVersionNote(row){if(row.id==='system' && updateFor('system')?.supported===false)return t('System updates require a native Linux installation. Rebuild the Docker image externally.');if(releaseManaged(row.id))return ''; if(moduleActionErrors.value[row.id])return t('Update failed');const update=updateFor(row.id);return moduleStateLabels[update?.state]?t(moduleStateLabels[update.state])+(update.state==='available' && update.candidate?.version?' · '+(row.id==='system'?update.candidate.version.slice(0,7):update.candidate.version):''):'';}
 function moduleProgress(row){const state=updateFor(row.id)?.state;return ['downloading','verifying','installing','restarting'].indexOf(state);}
 function moduleStatus(row){return row.status;}
 
@@ -27,7 +28,7 @@ const moduleRows = computed(() => {
   return [{
     id: 'system',
     name: t('Система (ядро)'),
-    version: status.value?.version || '—',
+    version: updateFor('system')?.current && updateFor('system').current!=='—'?updateFor('system').current:status.value?.version || '—',
     status: t('Работает')
   }, {
     id: 'mihomo',
@@ -80,7 +81,7 @@ const moduleRows = computed(() => {
 });
 
 function moduleActions(module) {
-  if(isReleaseManagedModule(module.id))return [];
+  if(releaseManaged(module.id) || module.id==='system' && !updateFor('system')?.supported)return [];
   const update=updateFor(module.id);
   return [{value:'check',label:t('Проверить обновление'),disabled:moduleWorking.value || !can('users:write')},...(update?.state==='available' && update.supported?[{value:'update',label:t('Обновить'),disabled:moduleWorking.value || !can('users:write')}]:[])];
 }
@@ -113,7 +114,7 @@ async function loadModuleStatus(signal) {
   domainCatalog.value=results[1].status==='fulfilled'?results[1].value:null;
   if(results[2].status==='fulfilled'){
     const next=Array.isArray(results[2].value.modules)?results[2].value.modules:[];
-    moduleUpdates.value=next.filter(row=>!isReleaseManagedModule(row.id));moduleServiceError.value='';
+    moduleUpdates.value=next.filter(row=>!releaseManaged(row.id));moduleServiceError.value='';
   }else moduleServiceError.value=results[2].reason.message;
 }
 

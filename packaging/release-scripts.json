@@ -7,6 +7,7 @@
   "clone-instance.mjs",
   "container-entrypoint.sh",
   "extract-module.py",
+  "extract-system.py",
   "fetch-access-modules.py",
   "fetch-modules.py",
   "fetch-runtime.py",
@@ -25,5 +26,6 @@
   "platform-support.sh",
   "prepare-modules.py",
   "release-bundles.py",
-  "seed-container-modules.py"
+  "seed-container-modules.py",
+  "system-update-worker.mjs"
 ]

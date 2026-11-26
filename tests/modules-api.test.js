@@ -17,9 +17,10 @@ test('module API requires admin and CSRF, forwards only fixed operations and rep
   assert.equal((await fetch(base+'modules',{method:'POST',headers,body:'{"op":"shell"}'})).status,400);
   assert.equal((await fetch(base+'modules',{method:'POST',headers,body:JSON.stringify({op:'update',id:'mihomo',version:'v2.0.0',url:'https://evil.example'})})).status,202);
   assert.deepEqual(calls.at(-1),{op:'update',id:'mihomo',version:'v2.0.0'});
+  assert.equal((await fetch(base+'modules',{method:'POST',headers,body:JSON.stringify({op:'check',id:'system'})})).status,202);assert.equal(calls.at(-1).id,'system');
   const staleCatalog=await fetch(base+'modules',{method:'POST',headers,body:JSON.stringify({op:'update',id:'domain-lists',version:'main'})});assert.equal(staleCatalog.status,409);assert.match((await staleCatalog.json()).error,/updates first/);
   fail=true;assert.equal((await fetch(base+'modules',{method:'POST',headers,body:'{"op":"check"}'})).status,409);
-  for(const id of ['system','outline','tor','lantern'])for(const op of ['check','update']){
+  for(const id of ['outline','tor','lantern'])for(const op of ['check','update']){
    const before=calls.length;const response=await fetch(base+'modules',{method:'POST',headers,body:JSON.stringify({id,op,version:'99'})});assert.equal(response.status,400);assert.equal(calls.length,before);
   }
   await fetch(base+'users',{method:'POST',headers,body:JSON.stringify({username:'operator',password:'operator password 12345',role:'operator'})});

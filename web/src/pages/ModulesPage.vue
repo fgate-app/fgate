@@ -42,9 +42,9 @@ const {t}=usePreferences();
               </AppTable>
             </div>
           </AppDataCard>
-        <AppDialog :open="!!management.moduleUpdateDialog" :title="t('Обновить модуль')" @close="management.moduleUpdateDialog=null">
+        <AppDialog :open="!!management.moduleUpdateDialog" :title="t(management.moduleUpdateDialog?.id==='system'?'Update FreedomGate':'Обновить модуль')" @close="management.moduleUpdateDialog=null">
           <div v-if="management.moduleUpdateDialog" class="form-section">
-            <p>{{management.moduleUpdateDialog.name}}: {{management.moduleUpdateDialog.version}} → {{management.updateFor(management.moduleUpdateDialog.id)?.candidate?.version}}</p>
+            <p>{{management.moduleUpdateDialog.name}}: {{management.moduleUpdateDialog.version}} → {{management.moduleUpdateDialog.id==='system'?management.updateFor('system')?.candidate?.version?.slice(0,7):management.updateFor(management.moduleUpdateDialog.id)?.candidate?.version}}</p>
             <p v-if="management.moduleUpdateDialog.id!=='diagnostic-blocklist'" class="muted">{{t('Во время обновления соединения могут кратковременно прерваться. При ошибке запуска будет восстановлена предыдущая версия.')}}</p>
           </div>
           <template #footer><AppButton variant="secondary" @click="management.moduleUpdateDialog=null">{{t('Отмена')}}</AppButton><AppButton :disabled="management.moduleWorking" data-testid="install-module" @click="management.installModule">{{t('Обновить')}}</AppButton></template>

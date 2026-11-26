@@ -63,3 +63,6 @@ server/tor/bin
 
 # Keep our modified source snapshot in the build context.
 !server/lantern/source/*.tar.gz
+
+!scripts/extract-system.py
+!scripts/system-update-worker.mjs

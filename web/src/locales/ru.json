@@ -2354,5 +2354,14 @@
   "Select gateways or groups.": "Выберите шлюзы или группы.",
   "Connection or gateway group not found.": "Шлюз или группа не найдены.",
   "Gateway groups cannot contain cycles.": "Группы шлюзов не могут содержать циклические ссылки.",
-  "This group is used by another group. Update the parent group first.": "Эта группа используется в другой группе. Сначала измените родительскую группу."
+  "This group is used by another group. Update the parent group first.": "Эта группа используется в другой группе. Сначала измените родительскую группу.",
+  "System updates require a native Linux installation. Rebuild the Docker image externally.": "Обновление системы доступно при обычной установке Linux. Для Docker пересоберите образ вне приложения.",
+  "Could not check for system updates.": "Не удалось проверить обновления системы.",
+  "Could not prepare the system update. The running version has been preserved.": "Не удалось подготовить обновление системы. Текущая версия сохранена.",
+  "System update was interrupted. Check the installed version before retrying.": "Обновление системы прервано. Перед повторной попыткой проверьте установленную версию.",
+  "System update failed. The previous application version has been restored.": "Обновление системы не удалось. Предыдущая версия приложения восстановлена.",
+  "System update failed. Could not restore freedomgate.service. Check the system journal.": "Обновление системы не удалось. Не удалось восстановить freedomgate.service. Проверьте системный журнал.",
+  "Check for system updates first.": "Сначала проверьте обновления системы.",
+  "Invalid system update revision.": "Некорректная ревизия обновления системы.",
+  "Update FreedomGate": "Обновить FreedomGate"
 }

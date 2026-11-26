@@ -24,6 +24,7 @@ import {dnsMatrixProviders,normalizeDnsMatrixName} from '../server/dns-matrix-ca
 import {replaceDhcpConfig} from '../server/dhcp-config.js';
 import {outlineDpiArgs,outlineDpiNft,OUTLINE_DPI_TABLE,OUTLINE_DPI_PRIORITY} from '../server/outline-dpi.js';
 import {ModuleUpdates} from '../server/module-updates.js';
+import {SystemUpdates} from '../server/system-updates.js';
 import { serveHelperConnection } from '../server/helper-protocol.js';
 import { createServer } from 'node:net';
 import { chmod, chown, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
@@ -497,7 +498,8 @@ async function statusNetwork() {
   };
 }
 
-let moduleDownloadGateways=[];
+let moduleDownloadGateways=[],moduleBatchTask=null;
+const systemUpdates=new SystemUpdates({fetchImpl:createResourceFetch({gateways:()=>moduleDownloadGateways})});
 const moduleUpdates=new ModuleUpdates({fetchImpl:createResourceFetch({gateways:()=>moduleDownloadGateways}),restart:async id=>{const zapret=zapretCurrent;await moduleUpdates.restartService(id);if(id==='zapret' && zapret)await zapretApply(zapret);}});
 const strategyDiagnostics=new ProxyStrategyHelper({run,paths:zapretPaths,stopDaemon:stopOwnedDaemon,runDir:RUN_DIR});
 
@@ -507,7 +509,7 @@ async function handle(request, {signal} = {}) {
   if(request.action==='diagnostic-strategy'){if(request.op==='start' && strategyQueue===ZAPRET_QNUM)return {ok:false,reason:'diagnostic-queue-unavailable'};return strategyDiagnostics.handle(request,{signal,interface:current?.uplink});}
   if(request?.action==='modules'){
     if(request.op!=='status' && !moduleUpdates.task)moduleDownloadGateways=validDownloadGateways(request.gateways);
-    try{if(request.op==='status')return {ok:true,modules:moduleUpdates.snapshot()};return moduleUpdates.start(request.op,request.id,request.version);}
+    try{if(request.op==='status'){await systemUpdates.recover();return {ok:true,modules:[...moduleUpdates.snapshot(),systemUpdates.snapshot()]};}if(moduleBatchTask||moduleUpdates.task||systemUpdates.busy)throw Object.assign(fail('Wait for the current update to finish.'),{status:409});if(request.op==='check' && request.id===undefined){moduleBatchTask=(async()=>{if(systemUpdates.supported)await systemUpdates.check();moduleUpdates.start('check');await moduleUpdates.task;})().catch(()=>systemUpdates.set({state:'error',error:'Could not check for system updates.'}).catch(()=>{})).finally(()=>{moduleBatchTask=null;});return {ok:true,accepted:true};}if(request.id==='system')return systemUpdates.start(request.op,request.version);return moduleUpdates.start(request.op,request.id,request.version);}
     catch(error){return {ok:false,status:error.status || 500,error:error.message};}
   }
   const action = String(request?.action || '');
@@ -590,6 +592,7 @@ async function handle(request, {signal} = {}) {
 }
 
 async function main() {
+  await systemUpdates.recover();
   await moduleUpdates.recover();
   await mkdir(RUN_DIR, { recursive: true });
   await strategyDiagnostics.recover();

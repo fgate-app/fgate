@@ -295,7 +295,7 @@ export function createServer(store, { supervisor = null, filter = null, interfac
         if(req.method==='POST' && session.role!=='admin')return send(403,{error:"Insufficient permissions."});
         if(req.method==='POST' && !['check','update'].includes(body.op))return send(400,{error:"Unknown update operation."});
         if(req.method==='POST')eventMetadata=moduleAuditDetail(body);
-        if(req.method==='POST' && isReleaseManagedModule(body.id))return send(400,{error:'This module is updated with the application.'});
+        if(req.method==='POST' && body.id!=='system' && isReleaseManagedModule(body.id))return send(400,{error:'This module is updated with the application.'});
         if(req.method==='POST' && body.id==='diagnostic-blocklist'){try{return send(202,diagnosticListUpdates.start(body.op,body.version));}catch(error){return send(error.status || 400,{error:error.message});}}
         if(req.method==='POST' && body.id==='domain-lists'){try{return send(202,domainUpdates.start(body.op,body.version));}catch(error){return send(error.status || 400,{error:error.message});}}
         const result=await modulesHelper(req.method==='GET'?'status':body.op,body.id,body.version,req.method==='POST'?downloadGateways(store,supervisor):[]);

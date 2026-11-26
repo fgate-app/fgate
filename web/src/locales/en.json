@@ -2354,5 +2354,14 @@
   "Select gateways or groups.": "Select gateways or groups.",
   "Connection or gateway group not found.": "Connection or gateway group not found.",
   "Gateway groups cannot contain cycles.": "Gateway groups cannot contain cycles.",
-  "This group is used by another group. Update the parent group first.": "This group is used by another group. Update the parent group first."
+  "This group is used by another group. Update the parent group first.": "This group is used by another group. Update the parent group first.",
+  "System updates require a native Linux installation. Rebuild the Docker image externally.": "System updates require a native Linux installation. Rebuild the Docker image externally.",
+  "Could not check for system updates.": "Could not check for system updates.",
+  "Could not prepare the system update. The running version has been preserved.": "Could not prepare the system update. The running version has been preserved.",
+  "System update was interrupted. Check the installed version before retrying.": "System update was interrupted. Check the installed version before retrying.",
+  "System update failed. The previous application version has been restored.": "System update failed. The previous application version has been restored.",
+  "System update failed. Could not restore freedomgate.service. Check the system journal.": "System update failed. Could not restore freedomgate.service. Check the system journal.",
+  "Check for system updates first.": "Check for system updates first.",
+  "Invalid system update revision.": "Invalid system update revision.",
+  "Update FreedomGate": "Update FreedomGate"
 }

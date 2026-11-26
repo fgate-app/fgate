@@ -38,6 +38,7 @@ def assemble(source,target,installer=False):
     for name in DIRECTORIES:
         if (source/name).exists():shutil.copytree(source/name,target/name,ignore=selected,symlinks=True)
     for name in FILES:shutil.copy2(source/name,target/name)
+    if (source/'system-release.json').is_file():shutil.copy2(source/'system-release.json',target/'system-release.json')
     if not installer and (source/'PROJECT_STATUS.md').is_file():shutil.copy2(source/'PROJECT_STATUS.md',target/'PROJECT_STATUS.md')
     (target/'web').mkdir()
     for name in WEB:

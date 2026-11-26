@@ -6,12 +6,14 @@ import {chromium,expect} from '@playwright/test';
 import {Store} from '../server/store.js';
 import {createServer} from '../server/index.js';
 import assert from 'node:assert/strict';
-const store=new Store(':memory:');let state='current',updates=0,frpState='stopped',torState='stopped',torInstalled=true,torUpdateState='current',torUpdateError=null;
+const store=new Store(':memory:');let state='current',updates=0,frpState='stopped',torState='stopped',torInstalled=true,torUpdateState='current',torUpdateError=null,systemState='current',systemSupported=true;
 const listDirectory=mkdtempSync(join(tmpdir(),'fg-blocklist-browser-'));const list=new DiagnosticBlocklist({directory:listDirectory,fetchImpl:async()=>new Response('example.com\n')});
 const server=createServer(store,{diagnosticBlocklist:list,diagnosticListFetch:async()=>new Response(JSON.stringify({sha:'b'.repeat(40)})),modulesHelper:async(op,id,version)=>{
+ if(id==='system' && op==='check'){systemState='available';return {ok:true};}
+ if(id==='system' && op==='update'){assert.equal(version,'a'.repeat(40));systemState='installing';return {ok:true};}
  if(op==='check'){state='available';return {ok:true};}
  if(op==='update'){assert.equal(id,'mihomo');assert.equal(version,'v99.0.0');updates++;state='updated';return {ok:true};}
- return {ok:true,modules:['mihomo','xray','adguard','zapret','frp','tor'].map(id=>({id,...(id==='tor'?{installed:torInstalled}:{}),current:id==='mihomo' && state==='updated'?'v99.0.0':'v1.0.0',state:id==='mihomo'?state:id==='tor'?torUpdateState:'current',...(id==='tor'?{error:torUpdateError}:{}),supported:true,candidate:{version:'v99.0.0'}}))};
+ return {ok:true,modules:[{id:'system',current:'1111111',supported:systemSupported,state:systemState,candidate:{version:'a'.repeat(40)}},...['mihomo','xray','adguard','zapret','frp','tor'].map(id=>({id,...(id==='tor'?{installed:torInstalled}:{}),current:id==='mihomo' && state==='updated'?'v99.0.0':'v1.0.0',state:id==='mihomo'?state:id==='tor'?torUpdateState:'current',...(id==='tor'?{error:torUpdateError}:{}),supported:true,candidate:{version:'v99.0.0'}}))]};
 }});server.accessPoints.moduleState=async()=>frpState;await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;let browser;
 try{
  browser=await chromium.launch({channel:'chrome',headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -42,9 +44,14 @@ try{
   await expect(torRow.getByTestId('module-version-note')).toHaveCount(0);await expect(torRow.getByTestId('module-update-error')).toHaveCount(0);await expect(torRow.locator('.row-menu-trigger')).toHaveCount(0);await expect(page.getByTestId('check-updates')).toBeEnabled();
  }
  await expect(torRow.getByTestId('module-version')).toHaveText('16.0.1');
- for(const name of ['Система','Shadowsocks Outline SDK','Lantern','Tor / Snowflake']){
+ for(const name of ['Shadowsocks Outline SDK','Lantern','Tor / Snowflake']){
   const bundled=page.getByTestId('module-row').filter({hasText:name});await expect(bundled.locator('.row-menu-trigger')).toHaveCount(0);await expect(bundled.getByTestId('module-version-note')).toHaveCount(0);await bundled.click();await expect(page.locator('.toast')).toHaveCount(0);
  }
+ const systemRow=page.getByTestId('module-row').filter({hasText:'Система'});
+ await systemRow.locator('.row-menu-trigger').click();await page.getByRole('menuitem',{name:'Проверить обновление',exact:true}).click();await expect(systemRow.getByTestId('module-version-note')).toContainText('aaaaaaa');
+ await systemRow.locator('.row-menu-trigger').click();await page.getByRole('menuitem',{name:'Обновить',exact:true}).click();await page.getByTestId('install-module').click();await expect(systemRow.getByTestId('module-update-progress')).toBeVisible();await expect(page.locator('dialog[open]')).toHaveCount(0);await page.screenshot({path:'/tmp/fg-system-update-progress.png',animations:'disabled'});
+ systemState='updated';await page.reload({waitUntil:'networkidle'});await expect(systemRow.getByTestId('module-update-progress')).toHaveCount(0);
+ systemSupported=false;await page.reload({waitUntil:'networkidle'});await expect(systemRow.locator('.row-menu-trigger')).toHaveCount(0);await expect(systemRow).toContainText('Docker');systemSupported=true;
  for(const theme of ['light','dark']){await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await page.screenshot({path:'/tmp/fg-module-status-'+theme+'.png',animations:'disabled'});}
  await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'/tmp/fg-module-status-mobile.png',animations:'disabled'});await page.setViewportSize({width:1440,height:1000});
 

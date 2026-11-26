@@ -2471,5 +2471,14 @@
   "Select gateways or groups.": "请选择网关或组。",
   "Connection or gateway group not found.": "未找到网关或组。",
   "Gateway groups cannot contain cycles.": "网关组不能包含循环引用。",
-  "This group is used by another group. Update the parent group first.": "此组被另一组使用，请先修改父组。"
+  "This group is used by another group. Update the parent group first.": "此组被另一组使用，请先修改父组。",
+  "System updates require a native Linux installation. Rebuild the Docker image externally.": "系统更新仅适用于原生 Linux 安装。Docker 请在应用外重新构建镜像。",
+  "Could not check for system updates.": "无法检查系统更新。",
+  "Could not prepare the system update. The running version has been preserved.": "无法准备系统更新。当前版本已保留。",
+  "System update was interrupted. Check the installed version before retrying.": "系统更新已中断。重试前请检查已安装版本。",
+  "System update failed. The previous application version has been restored.": "系统更新失败。已恢复应用的先前版本。",
+  "System update failed. Could not restore freedomgate.service. Check the system journal.": "系统更新失败。无法恢复 freedomgate.service。请检查系统日志。",
+  "Check for system updates first.": "请先检查系统更新。",
+  "Invalid system update revision.": "系统更新版本无效。",
+  "Update FreedomGate": "更新 FreedomGate"
 }
