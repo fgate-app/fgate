@@ -1,0 +1,35 @@
+{
+  "library/node:26.8.1-trixie": {
+    "digest": "sha256:f5d1cc40abc10c2843339a2134d07817cf33c405cb16bfd052b0ed790254c3a3",
+    "architectures": [
+      "amd64",
+      "arm64",
+      "ppc64le",
+      "s390x"
+    ]
+  },
+  "library/golang:1.25.0-trixie": {
+    "digest": "sha256:a733d0a3a4c2349114bfaa61b2f41bfd611d5dc4a95d0d12c485ff385bd285b3",
+    "architectures": [
+      "386",
+      "amd64",
+      "arm",
+      "arm64",
+      "ppc64le",
+      "riscv64",
+      "s390x"
+    ]
+  },
+  "library/debian:trixie-slim": {
+    "digest": "sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2",
+    "architectures": [
+      "386",
+      "amd64",
+      "arm",
+      "arm64",
+      "ppc64le",
+      "riscv64",
+      "s390x"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "version": "16.0.1",
+  "source": "https://archive.torproject.org/tor-package-archive/torbrowser/16.0.1/",
+  "platforms": {
+    "linux-arm64": {
+      "asset": "tor-expert-bundle-linux-aarch64-16.0.1.tar.gz",
+      "sha256": "67040520d44c87ccaaf5aa7df0dc1ff122eb938dbb600ae7722e8b6b75282a4b"
+    },
+    "linux-amd64": {
+      "asset": "tor-expert-bundle-linux-x86_64-16.0.1.tar.gz",
+      "sha256": "7039cb16060ab22e669852e55774d894b55f25ea8bd0ab7194d3478429a58725"
+    }
+  }
+}

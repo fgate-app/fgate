@@ -1,0 +1,32 @@
+import {chromium} from '@playwright/test';
+import {spawn} from 'node:child_process';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import assert from 'node:assert/strict';
+const folder=mkdtempSync(join(tmpdir(),'fg-session-'));
+const child=spawn(process.execPath,['server/index.js'],{env:{...process.env,PORT:'18885',FREEDOMGATE_DB:join(folder,'db.sqlite')},stdio:['ignore','pipe','pipe']});
+let browser;
+try {
+ await new Promise((resolve,reject)=>{child.stdout.once('data',resolve);child.once('exit',()=>reject(Error('Server failed')));});
+ browser=await chromium.launch({channel:'chrome',headless:true});
+ const page=await browser.newPage(),base='http://127.0.0.1:18885',errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(base,{waitUntil:'networkidle'});await page.getByLabel('Username').fill('admin');await page.getByLabel('Password',{exact:true}).fill('test password 12345');await page.getByRole('button',{name:'Create administrator'}).click();await page.getByTestId('overview-dashboard').waitFor();
+ await page.addInitScript(()=>{window.loginFlashed=false;new MutationObserver(()=>{if(document.querySelector('.auth-shell'))window.loginFlashed=true;}).observe(document,{childList:true,subtree:true});});
+ let release,arrive;const blocked=new Promise(resolve=>release=resolve),requested=new Promise(resolve=>arrive=resolve);
+ const delay=async route=>{arrive();await blocked;await route.continue();};
+ await page.route('**/api/auth/session',delay);
+ await page.reload({waitUntil:'domcontentloaded'});await requested;await page.getByTestId('session-loading').waitFor();
+ assert.equal(await page.locator('.auth-shell').count(),0);assert.equal(await page.locator('.shell').count(),0);
+ release();await page.getByTestId('overview-dashboard').waitFor();assert.equal(await page.evaluate(()=>window.loginFlashed),false);
+ await page.unroute('**/api/auth/session',delay);
+ let fail=true;
+ const failure=route=>fail?(fail=false,route.fulfill({status:503,json:{error:'Session temporarily unavailable'}})):route.continue();
+ await page.route('**/api/auth/session',failure);await page.reload({waitUntil:'networkidle'});
+ await page.getByRole('alert').filter({hasText:'Session temporarily unavailable'}).waitFor();assert.equal(await page.locator('.auth-shell').count(),0);
+ await page.getByRole('button',{name:'Retry',exact:true}).click();await page.getByTestId('overview-dashboard').waitFor();assert.equal(await page.evaluate(()=>window.loginFlashed),false);
+ await page.unroute('**/api/auth/session',failure);
+ const session=await(await page.request.get(base+'/api/auth/session')).json();await page.request.post(base+'/api/auth/logout',{headers:{'X-CSRF-Token':session.csrf},data:{}});
+ await page.reload({waitUntil:'networkidle'});await page.getByRole('button',{name:'Sign in',exact:true}).waitFor();assert.ok(await page.getByLabel('Username').isVisible());
+ assert.deepEqual(errors,[]);console.log('Delayed session reload never renders login; session failure retries; unauthenticated users see login after session resolution.');
+} finally {await browser?.close();child.kill();await new Promise(resolve=>child.once('exit',resolve));rmSync(folder,{recursive:true,force:true});}

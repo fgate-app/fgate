@@ -1,0 +1,12 @@
+import {ref} from 'vue';
+import {usePreferences} from '../preferences.js';
+import AppFileUpload from '../components/AppFileUpload.vue';
+const render=args=>({components:{AppFileUpload},setup:()=>({args,file:ref(args.modelValue || null),...usePreferences()}),template:'<div style="max-width:520px"><AppFileUpload v-bind="args" v-model="file" :label="t(args.label)" :hint="t(args.hint)" :error="args.error?t(args.error):undefined" /></div>'});
+export default {title:'Components/File Upload',component:AppFileUpload,args:{label:'Файл конфигурации',accept:'.txt,.ovpn,.conf,.json',maxSize:262144,hint:'TXT: ссылки или Base64-подписка; OpenVPN (.ovpn), WireGuard (.conf), Xray JSON. До 256 КБ.'},render,parameters:{docs:{description:{component:'Загрузка одного файла: выбор с устройства или перетаскивание, проверка формата и размера, замена и очистка. Использует AppButton, AppIcon и токены дизайн-системы. Значение v-model — File или null; отправка файла выполняется родительской формой.'}}}};
+export const Default={};
+export const Selected={args:{modelValue:new File(['[Interface]\n'],'wireguard.conf',{type:'text/plain'})}};
+export const LongFilename={args:{modelValue:new File(['{}'],'gateway-configuration-amsterdam-netherlands-production-backup-2026-11-13.json',{type:'application/json'})}};
+export const Loading={args:{...Selected.args,loading:true}};
+export const Disabled={args:{disabled:true}};
+export const DisabledSelected={args:{...Selected.args,disabled:true}};
+export const Error={args:{error:"The file could not be read. Choose another file."}};

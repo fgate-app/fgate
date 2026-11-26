@@ -1,0 +1,18 @@
+export const routeSyntaxCases=[
+ {id:'idn-tld',entry:'рф',yes:['xn--p1ai','xn--80aswg.xn--p1ai','sub.xn--80aswg.xn--p1ai','xn--c1abqtis.xn--p1ai'],no:['example.com']},
+ {id:'idn',entry:'сайт.рф',yes:['xn--80aswg.xn--p1ai','sub.xn--80aswg.xn--p1ai'],no:['xn--c1abqtis.xn--p1ai']},
+ {id:'idn-full',entry:'full:сайт.рф',yes:['xn--80aswg.xn--p1ai'],no:['sub.xn--80aswg.xn--p1ai','xn--c1abqtis.xn--p1ai']},
+ {id:'idn-wildcard',entry:'*.сайт.рф',yes:['sub.xn--80aswg.xn--p1ai'],no:['xn--80aswg.xn--p1ai','xn--c1abqtis.xn--p1ai']},
+ {id:'idn-alias',entry:'domain:сайт.рф',yes:['xn--80aswg.xn--p1ai'],no:['xn--c1abqtis.xn--p1ai']},
+ {id:'domain-prefix',entry:'domain:alias.example',yes:['alias.example','one.alias.example'],no:['otheralias.example']},
+ {id:'regexp-prefix-case',entry:'REGEXP:^api[0-9]{1,3}\\.prefix\\.example$',yes:['api12.prefix.example'],no:['api1234.prefix.example']},
+ {id:'suffix',entry:'suffix.example',yes:['suffix.example','one.suffix.example','two.one.suffix.example'],no:['othersuffix.example','suffix.example.other']},
+ {id:'exact',entry:'full:exact.example',yes:['exact.example'],no:['one.exact.example','exact.example.other']},
+ {id:'wildcard',entry:'*.wild.example',yes:['one.wild.example','two.one.wild.example'],no:['wild.example','one.wild.example.other']},
+ {id:'keyword',entry:'keyword:needle',yes:['needle.example','myneedle.example','one.needle.example'],no:['unrelated.example']},
+ {id:'regexp',entry:'regexp:^(api|cdn)[0-9]{1,3}\\.regex\\.example$',yes:['api1.regex.example','cdn123.regex.example'],no:['api1234.regex.example','one.api1.regex.example','other.regex.example']},
+ {id:'ipv4',entry:'192.0.2.5',yes:['192.0.2.5'],no:['192.0.2.6']},
+ {id:'cidr4',entry:'192.0.2.0/30',yes:['192.0.2.1','192.0.2.3'],no:['192.0.2.4','192.0.3.1']},
+ {id:'ipv6',entry:'2001:db8::5',yes:['2001:db8::5'],no:['2001:db8::6','192.0.2.5']},
+ {id:'cidr6',entry:'2001:db8::/126',yes:['2001:db8::1','2001:db8::3'],no:['2001:db8::4','2001:db8:1::1']},
+];

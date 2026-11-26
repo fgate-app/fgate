@@ -1,0 +1,53 @@
+#!/bin/sh
+# Privileged DNS guard for FreedomGate clients.
+# Redirects all client DNS (UDP/TCP 53) to the local AdGuard Home listener and
+# blocks DoT, so clients cannot bypass the configured resolvers/filters.
+# Only touches the dedicated table `inet freedomgate_dns`.
+set -eu
+TABLE=freedomgate_dns
+PORT=53053
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo 'root required' >&2
+  exit 1
+fi
+
+usage() {
+  echo "usage: $0 on <iface> <cidr> | off | status" >&2
+  exit 2
+}
+
+case "${1:-}" in
+  on)
+    iface=${2:-}
+    cidr=${3:-}
+    [ -n "$iface" ] && [ -d "/sys/class/net/$iface" ] || { echo 'unknown interface' >&2; exit 1; }
+    [ "$iface" != 'lo' ] || { echo 'loopback is not a client interface' >&2; exit 1; }
+    echo "$cidr" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$' || { echo 'invalid IPv4 subnet' >&2; exit 1; }
+    nft -f - <<EOF
+table inet $TABLE {
+  chain prerouting {
+    type nat hook prerouting priority dstnat; policy accept;
+    iifname "$iface" ip saddr $cidr udp dport 53 counter redirect to :$PORT comment "fg-dns-udp"
+    iifname "$iface" ip saddr $cidr tcp dport 53 counter redirect to :$PORT comment "fg-dns-tcp"
+  }
+  chain forward {
+    type filter hook forward priority filter; policy accept;
+    iifname "$iface" ip saddr $cidr tcp dport 853 counter drop comment "fg-dot-tcp"
+    iifname "$iface" ip saddr $cidr udp dport 853 counter drop comment "fg-dot-udp"
+  }
+}
+EOF
+    echo "applied $iface $cidr"
+    ;;
+  off)
+    nft delete table inet $TABLE 2>/dev/null || true
+    echo removed
+    ;;
+  status)
+    nft list table inet $TABLE 2>/dev/null || echo "table $TABLE absent"
+    ;;
+  *)
+    usage
+    ;;
+esac

@@ -1,0 +1,622 @@
+{
+  "timestamp": "2026-11-21T16:44:23.888Z",
+  "sources": {
+    "network": true,
+    "telemetry": true,
+    "clients": true,
+    "remoteClients": true,
+    "interfaceTraffic": true,
+    "zapret": true,
+    "frp": true
+  },
+  "network": {
+    "interfaces": [
+      {
+        "name": "Meta",
+        "type": "other",
+        "state": "unknown",
+        "carrier": true,
+        "addresses": [
+          "203.0.113.1/30"
+        ]
+      },
+      {
+        "name": "eth0",
+        "type": "ethernet",
+        "state": "up",
+        "carrier": true,
+        "addresses": [
+          "192.0.2.2/24"
+        ]
+      },
+      {
+        "name": "wlan0",
+        "type": "wifi",
+        "state": "up",
+        "carrier": true,
+        "addresses": [
+          "203.0.113.3/24"
+        ]
+      }
+    ],
+    "setup": {
+      "uplink": {
+        "interface": "eth0"
+      },
+      "client": {
+        "interface": "wlan0",
+        "type": "ap",
+        "vlanId": ""
+      },
+      "wired": {
+        "interface": "",
+        "enabled": false,
+        "vlanId": ""
+      }
+    }
+  },
+  "profiles": [
+    {
+      "id": "gw-00001",
+      "name": "Direct",
+      "engine": "direct",
+      "protocol": "direct",
+      "enabled": true,
+      "gatewayId": null
+    },
+    {
+      "id": "gw-00002",
+      "name": "Tor",
+      "engine": "tor",
+      "protocol": "tor",
+      "enabled": false,
+      "gatewayId": null
+    },
+    {
+      "id": "gw-00003",
+      "name": "Lantern",
+      "engine": "lantern",
+      "protocol": "lantern",
+      "enabled": false,
+      "gatewayId": null
+    },
+    {
+      "id": "gw-00004",
+      "name": "Обход DPI",
+      "engine": "zapret",
+      "protocol": "socks5",
+      "enabled": true,
+      "gatewayId": null
+    },
+    {
+      "id": "gw-00005",
+      "name": "VLESS 01",
+      "engine": "xray",
+      "protocol": "vless",
+      "enabled": false,
+      "gatewayId": "gw-00002"
+    },
+    {
+      "id": "gw-00006",
+      "name": "SS 01",
+      "engine": "outline",
+      "protocol": "ss",
+      "enabled": true,
+      "gatewayId": "gw-00008"
+    },
+    {
+      "id": "gw-00007",
+      "name": "SS 02",
+      "engine": "outline",
+      "protocol": "ss",
+      "enabled": true,
+      "gatewayId": "gw-00008"
+    },
+    {
+      "id": "gw-00008",
+      "name": "VLESS 02",
+      "engine": "xray",
+      "protocol": "vless",
+      "enabled": true,
+      "gatewayId": null
+    }
+  ],
+  "connectionGroups": [
+    {
+      "id": "group-001",
+      "name": "USA",
+      "members": [
+        "gw-00006"
+      ]
+    },
+    {
+      "id": "group-002",
+      "name": "VPN",
+      "members": [
+        "gw-00008"
+      ]
+    }
+  ],
+  "rules": {
+    "groups": [
+      {
+        "id": "rule-001",
+        "name": "ru",
+        "routeId": "gw-00001",
+        "enabled": true,
+        "entriesCount": 1
+      },
+      {
+        "id": "rule-002",
+        "name": "com",
+        "routeId": "group-002",
+        "enabled": true,
+        "entriesCount": 1
+      },
+      {
+        "id": "rule-003",
+        "name": "Youtube",
+        "routeId": "group-002",
+        "enabled": true,
+        "entriesCount": 7
+      },
+      {
+        "id": "rule-004",
+        "name": "Telegram",
+        "routeId": "group-002",
+        "enabled": true,
+        "entriesCount": 35
+      },
+      {
+        "id": "rule-005",
+        "name": "Open AI",
+        "routeId": "group-001",
+        "enabled": true,
+        "entriesCount": 25
+      },
+      {
+        "id": "rule-006",
+        "name": "Claude",
+        "routeId": "group-001",
+        "enabled": true,
+        "entriesCount": 21
+      },
+      {
+        "id": "rule-007",
+        "name": "Whatsapp",
+        "routeId": "group-002",
+        "enabled": true,
+        "entriesCount": 11
+      },
+      {
+        "id": "rule-008",
+        "name": "Facebook",
+        "routeId": "group-002",
+        "enabled": true,
+        "entriesCount": 397
+      },
+      {
+        "id": "rule-009",
+        "name": "VK",
+        "routeId": "gw-00004",
+        "enabled": true,
+        "entriesCount": 52
+      },
+      {
+        "id": "rule-010",
+        "name": "Wikipedia",
+        "routeId": "group-002",
+        "enabled": true,
+        "entriesCount": 18
+      },
+      {
+        "id": "rule-011",
+        "name": "X",
+        "routeId": "group-002",
+        "enabled": true,
+        "entriesCount": 24
+      },
+      {
+        "id": "rule-012",
+        "name": "Yandex Metrika",
+        "routeId": "block",
+        "enabled": true,
+        "entriesCount": 18
+      }
+    ],
+    "devices": []
+  },
+  "clients": [
+    {
+      "hostname": "Device 01",
+      "ip": "198.51.100.11",
+      "mac": "02:00:00:00:00:01",
+      "online": false,
+      "traffic": {
+        "upload": 18033513,
+        "download": 351481941
+      }
+    },
+    {
+      "hostname": "Device 02",
+      "ip": "198.51.100.12",
+      "mac": "02:00:00:00:00:02",
+      "online": true,
+      "traffic": {
+        "upload": 74981222,
+        "download": 11323539980
+      }
+    },
+    {
+      "hostname": "Device 03",
+      "ip": "198.51.100.13",
+      "mac": "02:00:00:00:00:03",
+      "online": false,
+      "traffic": {
+        "upload": 33057,
+        "download": 0
+      }
+    },
+    {
+      "hostname": "Device 04",
+      "ip": "198.51.100.14",
+      "mac": "02:00:00:00:00:04",
+      "online": false,
+      "traffic": {
+        "upload": 9476355,
+        "download": 252327173
+      }
+    },
+    {
+      "id": "remote-005",
+      "accessPointId": "access-008",
+      "accessPointName": "Cloud access",
+      "hostname": "Remote client 05",
+      "ip": "",
+      "mac": "",
+      "online": true,
+      "remote": true,
+      "traffic": {
+        "upload": 9676416,
+        "download": 235203373
+      }
+    },
+    {
+      "id": "remote-006",
+      "accessPointId": "access-008",
+      "accessPointName": "Cloud access",
+      "hostname": "Remote client 06",
+      "ip": "",
+      "mac": "",
+      "online": false,
+      "remote": true,
+      "traffic": {
+        "upload": 232214449,
+        "download": 531637617
+      }
+    },
+    {
+      "id": "remote-007",
+      "accessPointId": "access-008",
+      "accessPointName": "Cloud access",
+      "hostname": "Remote client 07",
+      "ip": "",
+      "mac": "",
+      "online": true,
+      "remote": true,
+      "traffic": {
+        "upload": 19339783,
+        "download": 1378953774
+      }
+    },
+    {
+      "id": "remote-008",
+      "accessPointId": "access-008",
+      "accessPointName": "Cloud access",
+      "hostname": "Remote client 08",
+      "ip": "",
+      "mac": "",
+      "online": false,
+      "remote": true,
+      "traffic": {
+        "upload": 0,
+        "download": 0
+      }
+    }
+  ],
+  "modules": [
+    {
+      "id": "mihomo",
+      "name": "mihomo",
+      "state": "running",
+      "version": "v1.19.34"
+    },
+    {
+      "id": "adguard",
+      "name": "AdGuard Home",
+      "state": "running",
+      "version": "v1.0.0"
+    },
+    {
+      "id": "xray",
+      "name": "Xray",
+      "state": "running",
+      "version": "v26.11.9"
+    },
+    {
+      "id": "outline",
+      "name": "Shadowsocks Outline SDK",
+      "state": "running",
+      "version": "0.1.0"
+    },
+    {
+      "id": "zapret",
+      "name": "zapret2",
+      "state": "running",
+      "version": "v1.0.7"
+    },
+    {
+      "id": "tor",
+      "name": "Tor",
+      "state": "unknown",
+      "version": "16.0.1"
+    },
+    {
+      "id": "lantern",
+      "name": "Lantern",
+      "state": "unknown",
+      "version": "1.2.8-fg5"
+    },
+    {
+      "id": "frp",
+      "name": "frp",
+      "state": "active",
+      "version": "v0.72.0"
+    }
+  ],
+  "telemetry": {
+    "available": true,
+    "profiles": {
+      "gw-00001": {
+        "available": true,
+        "httpStatus": "ok",
+        "upload": 882.7972027972028,
+        "download": 93687.27272727274,
+        "location": {
+          "country": "Russian Federation",
+          "countryCode": "RU"
+        }
+      },
+      "gw-00002": {
+        "available": false,
+        "httpStatus": "disabled",
+        "upload": 0,
+        "download": 0,
+        "location": {}
+      },
+      "gw-00003": {
+        "available": false,
+        "httpStatus": "disabled",
+        "upload": 0,
+        "download": 0,
+        "location": {}
+      },
+      "gw-00004": {
+        "available": true,
+        "httpStatus": "ok",
+        "upload": 0,
+        "download": 0,
+        "location": {
+          "country": "Russian Federation",
+          "countryCode": "RU"
+        }
+      },
+      "gw-00005": {
+        "available": false,
+        "httpStatus": "disabled",
+        "upload": 0,
+        "download": 0,
+        "location": {}
+      },
+      "gw-00006": {
+        "available": true,
+        "httpStatus": "ok",
+        "upload": 0,
+        "download": 0,
+        "location": {
+          "country": "Montenegro",
+          "countryCode": "ME"
+        }
+      },
+      "gw-00007": {
+        "available": true,
+        "httpStatus": "ok",
+        "upload": 0,
+        "download": 0,
+        "location": {
+          "country": "United States",
+          "countryCode": "US"
+        }
+      },
+      "gw-00008": {
+        "available": true,
+        "httpStatus": "ok",
+        "upload": 0,
+        "download": 0,
+        "location": {
+          "country": "Netherlands",
+          "countryCode": "NL"
+        }
+      }
+    },
+    "groups": {
+      "group-001": {
+        "selectedId": "gw-00006",
+        "httpStatus": "ok"
+      },
+      "group-002": {
+        "selectedId": "gw-00008",
+        "httpStatus": "ok"
+      }
+    }
+  },
+  "interfaceTraffic": {
+    "interfaces": {
+      "Meta": {
+        "receiveRate": 100801.36038629957,
+        "transmitRate": 100801.36038629957
+      },
+      "eth0": {
+        "receiveRate": 99831.93323503909,
+        "transmitRate": 4812.373186390235
+      },
+      "wlan0": {
+        "receiveRate": 3643.061258134749,
+        "transmitRate": 98244.06875130879
+      }
+    }
+  },
+  "observations": {
+    "available": true,
+    "sampledAt": "2026-11-21T16:44:23.101Z",
+    "paths": [
+      {
+        "routeKind": null,
+        "routeId": null,
+        "rule": "Match",
+        "sourceIP": "127.0.0.1",
+        "sourceMac": "",
+        "chains": [
+          "DIRECT"
+        ],
+        "upload": 3813,
+        "download": 11086,
+        "uploadRate": 0,
+        "downloadRate": 0,
+        "accessClientId": "remote-007",
+        "accessPointId": "access-008"
+      },
+      {
+        "routeKind": "groups",
+        "routeId": "rule-002",
+        "rule": "DomainSuffix",
+        "sourceIP": "127.0.0.1",
+        "sourceMac": "",
+        "chains": [
+          "p-gw-00008",
+          "p-gw-00008-grp",
+          "cg-group-002"
+        ],
+        "upload": 76567,
+        "download": 53776,
+        "uploadRate": 0,
+        "downloadRate": 0,
+        "accessClientId": "remote-005",
+        "accessPointId": "access-008"
+      },
+      {
+        "routeKind": null,
+        "routeId": null,
+        "rule": "Match",
+        "sourceIP": "198.51.100.12",
+        "sourceMac": "02:00:00:00:00:02",
+        "chains": [
+          "DIRECT"
+        ],
+        "upload": 108026,
+        "download": 18488,
+        "uploadRate": 2100.597609561753,
+        "downloadRate": 230.0796812749004
+      },
+      {
+        "routeKind": null,
+        "routeId": null,
+        "rule": "Match",
+        "sourceIP": "127.0.0.1",
+        "sourceMac": "",
+        "chains": [
+          "DIRECT"
+        ],
+        "upload": 252,
+        "download": 0,
+        "uploadRate": 0,
+        "downloadRate": 0,
+        "accessClientId": "remote-005",
+        "accessPointId": "access-008"
+      },
+      {
+        "routeKind": null,
+        "routeId": null,
+        "rule": "",
+        "sourceIP": "127.0.0.1",
+        "sourceMac": "",
+        "chains": [
+          "p-gw-00008"
+        ],
+        "upload": 336,
+        "download": 464,
+        "uploadRate": 0,
+        "downloadRate": 0
+      },
+      {
+        "routeKind": "groups",
+        "routeId": "rule-002",
+        "rule": "DomainSuffix",
+        "sourceIP": "127.0.0.1",
+        "sourceMac": "",
+        "chains": [
+          "p-gw-00008",
+          "p-gw-00008-grp",
+          "cg-group-002"
+        ],
+        "upload": 22500,
+        "download": 0,
+        "uploadRate": 0,
+        "downloadRate": 0
+      },
+      {
+        "routeKind": null,
+        "routeId": null,
+        "rule": "",
+        "sourceIP": "",
+        "sourceMac": "",
+        "chains": [
+          "p-gw-00004",
+          "p-gw-00004-grp"
+        ],
+        "upload": 26127,
+        "download": 56079,
+        "uploadRate": 0,
+        "downloadRate": 0
+      },
+      {
+        "routeKind": "groups",
+        "routeId": "rule-001",
+        "rule": "DomainSuffix",
+        "sourceIP": "198.51.100.12",
+        "sourceMac": "02:00:00:00:00:02",
+        "chains": [
+          "DIRECT"
+        ],
+        "upload": 11143,
+        "download": 4553735,
+        "uploadRate": 1042.8286852589642,
+        "downloadRate": 333367.5298804781
+      },
+      {
+        "routeKind": null,
+        "routeId": null,
+        "rule": "",
+        "sourceIP": "127.0.0.1",
+        "sourceMac": "",
+        "chains": [
+          "DIRECT"
+        ],
+        "upload": 40,
+        "download": 64,
+        "uploadRate": 0,
+        "downloadRate": 0
+      }
+    ]
+  }
+}

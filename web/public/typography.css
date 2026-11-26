@@ -1,0 +1,40 @@
+/* Shared by the application, Storybook and the standalone PWA offline screen.
+   Primitive values preserve the existing UI; use role tokens where available. */
+:root{
+  --font-size-9:9px;
+  --font-size-10:10px;
+  --font-size-11:11px;
+  --font-size-12:12px;
+  --font-size-13:13px;
+  --font-size-14:14px;
+  --font-size-16:16px;
+  --font-size-17:17px;
+  --font-size-18:18px;
+  --font-size-20:20px;
+  --font-size-21:21px;
+  --font-size-24:24px;
+  --font-size-25:25px;
+  --font-size-26:26px;
+  --font-size-30:30px;
+  --font-size-32:32px;
+  --font-size-110:110px;
+
+  --font-size-body:var(--font-size-13);
+  --font-size-caption:var(--font-size-12);
+  --font-size-control:var(--font-size-13);
+  --font-size-button-m:var(--font-size-14);
+  --font-size-button-s:var(--font-size-12);
+  --font-size-label-m:var(--font-size-13);
+  --font-size-label-s:var(--font-size-12);
+  --font-size-table:var(--font-size-13);
+  --font-size-table-heading:var(--font-size-11);
+  --font-size-heading-page:var(--font-size-30);
+  --font-size-heading-page-compact:var(--font-size-26);
+  --font-size-heading-dialog:var(--font-size-18);
+  --font-size-heading-section:var(--font-size-16);
+  --font-size-brand:var(--font-size-21);
+  --font-size-brand-compact:var(--font-size-17);
+  --font-size-chart-label:var(--font-size-10);
+  --font-size-metric:clamp(var(--font-size-20),2vw,var(--font-size-30));
+  --font-size-metric-compact:clamp(var(--font-size-18),1.7vw,var(--font-size-26));
+}

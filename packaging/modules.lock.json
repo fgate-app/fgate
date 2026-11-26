@@ -1,0 +1,103 @@
+{
+  "platform": "linux-arm64",
+  "modules": [
+    {
+      "id": "mihomo",
+      "version": "v1.19.33",
+      "repository": "MetaCubeX/mihomo",
+      "asset": "mihomo-linux-arm64-v1.19.33.gz",
+      "sha256": "ba408b317080ee265c46cb923a50018c1b82cbd708551cdd46a1e3e307396187",
+      "format": "gzip",
+      "binary": "mihomo",
+      "platforms": {
+        "linux-arm64": {
+          "asset": "mihomo-linux-arm64-v1.19.33.gz",
+          "sha256": "ba408b317080ee265c46cb923a50018c1b82cbd708551cdd46a1e3e307396187"
+        },
+        "linux-amd64": {
+          "asset": "mihomo-linux-amd64-compatible-v1.19.33.gz",
+          "sha256": "386508bfb1c72c43b6a0eda73708ecdce82546581b0ebcb16366c53757c622b6"
+        }
+      }
+    },
+    {
+      "id": "xray",
+      "version": "v26.10.31",
+      "repository": "XTLS/Xray-core",
+      "asset": "Xray-linux-arm64-v8a.zip",
+      "sha256": "1811c8f1da0c3b6dc707ebaf1c8390e987ba39859a8f0a7aadd8526157f2ec8d",
+      "format": "zip",
+      "member": "xray",
+      "binary": "xray",
+      "platforms": {
+        "linux-arm64": {
+          "asset": "Xray-linux-arm64-v8a.zip",
+          "sha256": "1811c8f1da0c3b6dc707ebaf1c8390e987ba39859a8f0a7aadd8526157f2ec8d"
+        },
+        "linux-amd64": {
+          "asset": "Xray-linux-64.zip",
+          "sha256": "e4bd9119f50ae7c41658b1abd0679ae06f98bd864a2907ff33f2f2cf7081b214"
+        }
+      }
+    },
+    {
+      "id": "adguard",
+      "version": "v0.107.80",
+      "repository": "AdguardTeam/AdGuardHome",
+      "asset": "AdGuardHome_linux_arm64.tar.gz",
+      "sha256": "d5e17d0d724418ddef8b7723ed8ade7eef4e621ec5b0e43a341859cca71a3d8f",
+      "format": "tar.gz",
+      "member": "./AdGuardHome/AdGuardHome",
+      "binary": "AdGuardHome",
+      "platforms": {
+        "linux-arm64": {
+          "asset": "AdGuardHome_linux_arm64.tar.gz",
+          "sha256": "d5e17d0d724418ddef8b7723ed8ade7eef4e621ec5b0e43a341859cca71a3d8f"
+        },
+        "linux-amd64": {
+          "asset": "AdGuardHome_linux_amd64.tar.gz",
+          "sha256": "28593bc761d71469abdbc6f39ca42cbed763ec92b63082c729177b037ed51d18"
+        }
+      }
+    }
+  ],
+  "sourceModules": [
+    {
+      "id": "zapret2",
+      "repository": "bol-van/zapret2",
+      "commit": "038c97e5819df10f8e8c22a2f1fffe57f2f7379b",
+      "build": "make -j2",
+      "binary": "binaries/my/nfqws2",
+      "binarySha256OnTestRpi": "74828b5f6a4a025691d6e09bb8b58909522cb79f4ec091e8abaca1a245119de5",
+      "activation": "disabled",
+      "sourceSha256": "f31711fa2dc94135bd295542c8024e5db8f6adf71d4c542f7289f3e04347e29d"
+    },
+    {
+      "id": "metacube-rules",
+      "repository": "MetaCubeX/meta-rules-dat",
+      "commit": "ca7d9d641cf31a25d465861d8af0352e6721b6e0",
+      "license": "GPL-3.0",
+      "branch": "meta"
+    }
+  ],
+  "bundledModules": [
+    {
+      "id": "outline",
+      "name": "Shadowsocks Outline SDK",
+      "version": "0.1.0",
+      "path": "server/outline",
+      "bridgeVersion": "0.2.0",
+      "module": "golang.getoutline.org/sdk",
+      "source": "https://github.com/OutlineFoundation/outline-sdk"
+    },
+    {
+      "id": "frp",
+      "name": "frp",
+      "version": "0.65.0",
+      "path": "server/access-points/bin",
+      "lock": "server/access-points/assets.json",
+      "source": "https://github.com/fatedier/frp",
+      "license": "Apache-2.0"
+    }
+  ]
+}

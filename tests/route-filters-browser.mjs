@@ -1,0 +1,50 @@
+import {chromium} from '@playwright/test';import {spawn} from 'node:child_process';import {mkdtempSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';import assert from 'node:assert/strict';
+const folder=mkdtempSync(join(tmpdir(),'fg-route-filter-'));
+const server=spawn(process.execPath,['server/index.js'],{env:{...process.env,PORT:'18878',FREEDOMGATE_DB:join(folder,'test.sqlite')},stdio:['ignore','pipe','pipe']});let browser;
+try{
+ await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('exit',()=>reject(Error('Server failed')));});
+ browser=await chromium.launch({channel:'chrome',headless:true});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));const base='http://127.0.0.1:18878';
+ await page.goto(base,{waitUntil:'networkidle'});await page.getByLabel('Username').fill('admin');await page.getByLabel('Password',{exact:true}).fill('test password 12345');await page.getByRole('button',{name:'Create administrator'}).click();await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
+ const session=await (await page.request.get(base+'/api/auth/session')).json();
+ async function post(path,value){const response=await page.request.post(base+'/api/'+path,{headers:{'X-CSRF-Token':session.csrf},data:value});assert.ok(response.ok(),await response.text());return response.json();}
+ const profiles=await (await page.request.get(base+'/api/profiles')).json(),direct=profiles.find(p=>p.engine==='direct'),zapret=profiles.find(p=>p.engine==='zapret');
+ const group=await post('connection-groups',{name:'Automatic',members:[zapret.id]});
+ await post('routes/groups',{name:'Direct route',entries:['direct.example'],routeId:direct.id});
+ await post('routes/groups',{name:'Grouped route',entries:['grouped.example'],routeId:group.id});
+ await post('routes/devices',{name:'Phone',identifier:'10.20.0.115',routeId:group.id});
+ await page.goto(base+'/routes/domains',{waitUntil:'networkidle'});assert.equal(await page.getByTestId('route-filters').count(),0,'filters are initially hidden');
+ const rows=page.getByTestId('route-group-row');
+ assert.match(await rows.first().textContent(),/Direct route/);
+ assert.equal(await rows.first().getByRole('button',{name:'Move up',exact:true}).isDisabled(),true);
+ await rows.first().locator('.row-menu-trigger').click();assert.equal(await page.getByRole('menuitem',{name:'Edit',exact:true}).count(),1);await page.keyboard.press('Escape');
+ await rows.first().getByRole('button',{name:'Move down',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('[data-testid="route-group-row"]')?.textContent.includes('Grouped route'));
+ await page.reload({waitUntil:'networkidle'});assert.match(await rows.first().textContent(),/Grouped route/);
+ await rows.first().getByRole('button',{name:'Move down',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('[data-testid="route-group-row"]')?.textContent.includes('Direct route'));
+ assert.equal(await page.getByTestId('toggle-route-filter').evaluate(el=>el.closest('th')?.classList.contains('actions-col')),true);
+ assert.deepEqual(await page.getByTestId('toggle-route-filter').locator('.app-icon').evaluate(el=>[getComputedStyle(el).width,getComputedStyle(el).height]),await rows.first().locator('.row-menu-trigger .app-icon').evaluate(el=>[getComputedStyle(el).width,getComputedStyle(el).height]));
+ await page.getByTestId('toggle-route-filter').click();
+ const panel=page.getByTestId('route-filters');assert.equal(await panel.locator('label').count(),0);assert.equal(await panel.locator('input:not(.control-s)').count(),0);assert.equal(await panel.evaluate(el=>getComputedStyle(el).borderTopStyle),'solid');assert.equal(await panel.getByRole('button',{name:'Reset',exact:true}).evaluate(el=>getComputedStyle(el).flexGrow),'0');
+ await page.getByLabel('Search rules').fill('grouped.example');assert.equal(await page.getByTestId('route-group-row').count(),1);assert.match(page.url(),/q=grouped/);
+ await page.getByRole('button',{name:'Reset',exact:true}).click();assert.equal(await page.getByTestId('route-group-row').count(),2);
+ await page.getByLabel('Filter by gateway').click();await page.getByRole('option',{name:'Direct',exact:true}).click();assert.equal(await page.getByTestId('route-group-row').count(),1);
+ await page.getByTestId('toggle-route-filter').click();assert.equal(await page.getByTestId('route-filters').count(),0);assert.equal(await page.getByTestId('route-group-row').count(),1,'hiding preserves the active filter');
+ await page.getByTestId('toggle-route-filter').click();await page.getByLabel('Filter by gateway').click();await page.getByRole('option',{name:'All gateways',exact:true}).click();assert.equal(await page.getByTestId('route-group-row').count(),2);
+ await page.getByLabel('Search rules').fill('nothing-matches');assert.equal(await page.getByTestId('route-group-row').count(),0);assert.ok(await page.getByTestId('toggle-route-filter').isVisible(),'filter remains accessible with empty results');await page.getByLabel('Search rules').fill('');
+
+ await page.locator('aside nav').getByRole('button',{name:'Gateways',exact:true}).click();
+ const zapretRow=page.getByTestId('exit-row').filter({hasText:'DPI bypass'});await zapretRow.getByTestId('connection-route-count').getByText('2',{exact:true}).waitFor();
+ await zapretRow.locator('.row-menu-trigger').click();await page.getByRole('menuitem',{name:'Go to rules',exact:true}).click();
+ await page.getByTestId('route-filters').waitFor();await page.getByTestId('route-group-row').waitFor();assert.equal(new URL(page.url()).searchParams.get('connection'),zapret.id);assert.equal(await page.getByTestId('route-group-row').count(),1);assert.match(await page.getByTestId('route-group-row').textContent(),/Grouped route/);
+ await page.reload({waitUntil:'networkidle'});await page.getByTestId('route-filters').waitFor();await page.getByTestId('route-group-row').waitFor();assert.equal(await page.getByTestId('route-group-row').count(),1);
+ await page.getByRole('tab',{name:'Devices',exact:true}).click();await page.getByTestId('route-device-row').waitFor();assert.equal(await page.getByTestId('route-device-row').count(),1);assert.equal(new URL(page.url()).searchParams.get('connection'),zapret.id);
+ await page.goBack();await page.getByTestId('route-group-row').waitFor();assert.equal(new URL(page.url()).searchParams.get('connection'),zapret.id);
+ await page.setViewportSize({width:390,height:844});assert.ok(await page.getByTestId('toggle-route-filter').isVisible());await page.getByTestId('toggle-route-filter').click();assert.equal(await page.getByTestId('route-filters').count(),0);await page.getByTestId('toggle-route-filter').click();await page.getByTestId('route-filters').waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'/tmp/freedomgate-route-filters-mobile.png',fullPage:true});
+ await page.evaluate(()=>localStorage.setItem('fg.locale','ru'));await page.goto(base+'/routes/domains',{waitUntil:'networkidle'});
+ await page.getByTestId('route-group-row').first().getByRole('button',{name:'Переместить ниже',exact:true}).waitFor();
+ await page.getByTestId('route-group-row').first().locator('.row-menu-trigger').click();await page.getByRole('menuitem',{name:'Редактировать',exact:true}).waitFor();await page.keyboard.press('Escape');
+ await page.screenshot({path:'/tmp/freedomgate-rule-arrows-mobile.png',fullPage:true});
+ await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'/tmp/freedomgate-rule-arrows-desktop.png',fullPage:true});
+ assert.deepEqual(errors,[]);console.log('Route filters: counts, group membership, search, connection selection, menu navigation, URL restore/back and mobile passed.');
+}finally{await browser?.close();server.kill();await new Promise(r=>server.once('exit',r));rmSync(folder,{recursive:true,force:true});}

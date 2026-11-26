@@ -1,0 +1,1 @@
+export function formatTrafficRate(value){if(value==null)return '—';const units=['B/s','KB/s','MB/s','GB/s'];let index=0;while(value>=1024 && index<3){value/=1024;index++;}return `${value.toFixed(index?1:0)} ${units[index]}`;}

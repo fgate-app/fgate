@@ -1,0 +1,12 @@
+import GatewayLocation from '../components/GatewayLocation.vue';
+const location={ip:'203.0.113.8',countryCode:'NL',country:'Netherlands',city:'Amsterdam',provider:'Example Transit'};
+export default {title:'Components/Gateway location',component:GatewayLocation,args:{location},render:args=>({components:{GatewayLocation},setup:()=>({args}),template:'<GatewayLocation v-bind="args" />'})};
+export const Country={};
+export const Lowercase={args:{location:{...location,countryCode:'nl'}}};
+export const MissingCode={args:{location:{...location,countryCode:undefined}}};
+export const InvalidCode={args:{location:{...location,countryCode:'XX'}}};
+export const LegacyRussia={args:{location:{...location,countryCode:undefined,country:'Russia',city:'Dolgoprudnyy'}}};
+export const LegacyRussianName={args:{location:{...location,countryCode:undefined,country:'Россия',city:'Dolgoprudnyy'}}};
+export const LegacyUnitedStates={args:{location:{...location,countryCode:undefined,country:'United States',city:'Las Vegas'}}};
+export const LegacyNetherlands={args:{location:{...location,countryCode:undefined,country:'The Netherlands'}}};
+export const UnknownCountry={args:{location:{...location,countryCode:undefined,country:'Unrecognized location'}}};

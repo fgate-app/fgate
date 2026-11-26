@@ -1,0 +1,10 @@
+import { ref } from 'vue';
+import AppButton from '../components/AppButton.vue';
+import AppInput from '../components/AppInput.vue';
+import AppSelect from '../components/AppSelect.vue';
+import AppCheckbox from '../components/AppCheckbox.vue';
+import AppSwitch from '../components/AppSwitch.vue';
+export default {title:'Components/Controls',args:{size:'m',disabled:false},argTypes:{size:{control:'select',options:['m','s']}},render:args=>({components:{AppButton,AppInput,AppSelect,AppCheckbox,AppSwitch},setup:()=>({args,text:ref(''),selected:ref('vless'),checked:ref(false),enabled:ref(false)}),template:`<div class="controls-grid"><div class="controls-row"><AppButton v-for="variant in ['primary','secondary','outline','blanc']" :key="variant" :variant="variant" v-bind="args">{{variant}}</AppButton></div><label>Name<AppInput v-model="text" v-bind="args" placeholder="Connection name"/></label><label>Protocol<AppSelect v-model="selected" v-bind="args" label="Protocol" :options="[{value:'vless',label:'VLESS'},{value:'ss',label:'Shadowsocks'}]"/></label><AppCheckbox v-model="checked" v-bind="args" label="Enable notifications"/><AppSwitch v-model="enabled" v-bind="args" label="Enable connection"/></div>`})};
+export const Medium={};
+export const Small={args:{size:'s'}};
+export const Disabled={args:{disabled:true}};

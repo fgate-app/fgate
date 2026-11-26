@@ -1,0 +1,107 @@
+# Dependencies and generated artifacts
+node_modules/
+web/dist/
+storybook-static/
+coverage/
+playwright-report/
+test-results/
+__pycache__/
+*.py[cod]
+*.tsbuildinfo
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Local application state, databases, credentials and environment overrides
+.data/
+.env
+.env.*
+*.local
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.key
+*.pem
+*.p12
+*.pfx
+*.keystore
+*.jks
+secrets/
+credentials/
+backups/
+dumps/
+*.tar.gz
+*.tgz
+
+# Agent instructions, memories and local editor/tool state
+AGENTS
+AGENTS.*
+CLAUDE
+CLAUDE.*
+GEMINI
+GEMINI.*
+SKILL.md
+.codex/
+.agents/
+.claude/
+.cursor/
+.cursorrules
+.cursorignore
+.windsurf/
+.windsurfrules
+.aider*
+.continue/
+.idea/
+.vscode/
+
+# Audit evidence stays local
+docs/test-reports/
+
+# Documentation stays local; only the root README is published
+*.[mM][dD]
+*.[mM][aA][rR][kK][dD][oO][wW][nN]
+!/README.md
+
+# Local diagnostic scripts; may contain real provider configurations
+scripts/test-*.py
+scripts/debug-*.py
+scripts/check-*.py
+scripts/find-*.py
+scripts/diagnose-dns.py
+
+# Binaries are downloaded or built from upstream sources during installation.
+server/outline/bin/
+server/access-points/bin/
+server/lantern/bin/
+server/tor/bin/
+packaging/release-bundles/
+
+# Additional agent rules and instruction formats (at any directory depth)
+AGENTS/
+agent-instructions/
+.github/copilot-instructions.*
+.github/instructions/
+.github/prompts/
+.windsurf/rules/
+.clinerules
+.clinerules/
+.roo/
+.opencode/
+
+# Private diagnostic captures / exports
+*.fgconfig
+*.pcap
+*.pcapng
+*.har
+*.bak
+
+# Our modified Lantern source snapshot is an installation build input.
+!/server/lantern/source/*.tar.gz

@@ -1,0 +1,11 @@
+import {ref} from 'vue';
+import AppInput from '../components/AppInput.vue';
+import AppTextarea from '../components/AppTextarea.vue';
+import AppSelect from '../components/AppSelect.vue';
+import AppButton from '../components/AppButton.vue';
+const sizes=[9,10,11,12,13,14,16,17,18,20,21,24,25,26,30,32,110];
+const roles=['body','caption','control','button-m','button-s','label-m','label-s','table','table-heading','heading-page','heading-page-compact','heading-dialog','heading-section','brand','brand-compact','chart-label','metric','metric-compact'];
+export default {title:'Foundations/Typography'};
+export const Scale={render:()=>({setup:()=>({sizes}),template:`<section class="form-section"><h3>Font size scale</h3><div v-for="size in sizes" :key="size" style="display:grid;gap:var(--space-2);overflow-wrap:anywhere"><code :style="{fontSize:'var(--font-size-caption)'}">--font-size-{{size}}</code><span :data-font-token="'--font-size-'+size" :style="{fontSize:'var(--font-size-'+size+')'}">FreedomGate · Сеть · 网络</span></div></section>`})};
+export const Roles={render:()=>({setup:()=>({roles}),template:`<section class="form-section"><h3>Typography roles</h3><div v-for="role in roles" :key="role" style="display:grid;gap:var(--space-2)"><code :style="{fontSize:'var(--font-size-caption)'}">--font-size-{{role}}</code><span :data-font-token="'--font-size-'+role" :style="{fontSize:'var(--font-size-'+role+')'}">FreedomGate · Сеть · 网络</span></div></section>`})};
+export const FormControls={render:()=>({components:{AppInput,AppTextarea,AppSelect,AppButton},setup:()=>({value:ref('FreedomGate'),selected:ref('primary')}),template:`<div class="form-section" style="max-width:560px"><label>Input m<AppInput v-model="value" size="m" /></label><label>Input s<AppInput v-model="value" size="s" /></label><label>Textarea m<AppTextarea v-model="value" size="m" /></label><label>Textarea s<AppTextarea v-model="value" size="s" /></label><label>Select m<AppSelect v-model="selected" size="m" label="Select m" :options="[{value:'primary',label:'Primary'}]" /></label><label>Select s<AppSelect v-model="selected" size="s" label="Select s" :options="[{value:'primary',label:'Primary'}]" /></label><div class="row"><AppButton size="m">Button m</AppButton><AppButton size="s">Button s</AppButton></div></div>`})};

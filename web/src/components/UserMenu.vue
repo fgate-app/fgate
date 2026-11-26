@@ -1,0 +1,21 @@
+<script setup>
+import { ref, nextTick, onMounted, onUnmounted, onBeforeUnmount } from 'vue';
+import AppButton from './AppButton.vue';
+import AppIcon from './AppIcon.vue';
+import AppSelect from './AppSelect.vue';
+import {cancelOverlay,enterOverlay,leaveOverlay} from '../lib/overlay-motion.js';
+import {canInstall,installApp} from '../pwa.js';
+import { usePreferences } from '../preferences.js';
+defineProps({user:{type:Object,required:true},roleLabel:String,disabled:Boolean,canSystem:Boolean,compact:Boolean});
+const emit=defineEmits(['logout','system']);
+const {locale,theme,t,languageOptions}=usePreferences();
+const open=ref(false),root=ref(),popup=ref(),trigger=ref(),position=ref({}),teleportTarget=ref('body');
+function place(){if(!open.value || !root.value)return;if(!root.value.getClientRects().length){open.value=false;return;}const rect=root.value.getBoundingClientRect(),width=Math.min(300,innerWidth-24),above=rect.top>innerHeight-rect.bottom;position.value={position:'fixed',width:width+'px',left:Math.max(12,Math.min(rect.left,innerWidth-width-12))+'px',maxHeight:Math.max(0,(above?rect.top:innerHeight-rect.bottom)-20)+'px',...(above?{bottom:(innerHeight-rect.top+8)+'px'}:{top:(rect.bottom+8)+'px'})};}
+async function toggle(){teleportTarget.value=root.value?.closest('dialog')?.querySelector('[data-popup-host]') || 'body';open.value=!open.value;if(open.value){place();await nextTick();popup.value?.querySelector('input')?.focus();}}
+function outside(event){if(!root.value?.contains(event.target) && !popup.value?.contains(event.target) && !event.target.closest?.('.select-popup'))open.value=false;}
+function escape(event){if(event.key==='Escape' && open.value){open.value=false;trigger.value?.focus();}}
+onMounted(()=>{document.addEventListener('pointerdown',outside);document.addEventListener('focusin',outside);document.addEventListener('keydown',escape);window.addEventListener('resize',place);window.addEventListener('scroll',place,true);});
+onBeforeUnmount(()=>cancelOverlay(popup.value));
+onUnmounted(()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('focusin',outside);document.removeEventListener('keydown',escape);window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true);});
+</script>
+<template><div ref="root" class="user-menu"><AppButton :variant="compact?'blanc':'secondary'" ref="trigger" class="user-trigger" :class="{'user-trigger-compact':compact}" :icon-only="compact" type="button" :data-testid="compact?'mobile-profile':'user-menu'" :aria-label="t('Меню пользователя')" :title="user.username" :aria-expanded="open" aria-haspopup="dialog" @click="toggle"><AppIcon name="account"/><span v-if="!compact"><strong>{{user.username}}</strong><small>{{roleLabel}}</small></span><AppIcon v-if="!compact" name="chevron" :class="{rotated:open}"/></AppButton><Teleport :to="teleportTarget"><Transition :css="false" @enter="enterOverlay" @leave="leaveOverlay"><div v-if="open" ref="popup" class="user-popup" role="dialog" :aria-label="t('Меню пользователя')" :style="position"><div class="user-popup-title"><div><strong>{{user.username}}</strong><small>{{roleLabel}}</small></div><AppButton variant="secondary" size="m" icon-only type="button" data-testid="user-logout" :aria-label="t('Выйти')" :title="t('Выйти')" :disabled="disabled" @click="open=false;emit('logout')"><AppIcon name="logout"/></AppButton></div><div class="preferences"><label><span>{{t('Язык')}}</span><AppSelect v-model="locale" data-testid="language" size="s" :label="t('Язык')" :options="languageOptions" /></label><label><span>{{t('Тема')}}</span><AppSelect v-model="theme" data-testid="theme" size="s" :label="t('Тема')" :options="[{value:'dark',label:t('Тёмная')},{value:'light',label:t('Светлая')}]" /></label></div><AppButton v-if="canInstall" variant="secondary" type="button" class="user-signout user-reload" data-testid="install-app" @click="open=false;installApp()"><AppIcon name="install"/>{{t('Установить приложение')}}</AppButton><AppButton v-if="canSystem" variant="secondary" type="button" class="user-signout user-reload" data-testid="user-reload" :disabled="disabled" @click="open=false;emit('system')"><AppIcon name="restart"/>{{t('Перезагрузить')}}</AppButton></div></Transition></Teleport></div></template>

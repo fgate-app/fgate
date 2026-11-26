@@ -1,0 +1,90 @@
+/* Interface colors are roles, not numbered steps in an arbitrary palette.
+   Visualization series live separately in chart-colors.css. */
+:root,[data-ui-theme="dark"]{
+  --color-white:#ffffff;
+  --color-page:#101318;
+  --color-surface:#161a20;
+  --color-secondary:#1c2128;
+  --color-secondary-hover:#21272f;
+  --color-secondary-active:#29313b;
+  --color-accent-soft:#192c43;
+  --color-accent-selected:#203d61;
+  --color-border-subtle:#252b33;
+  --color-border:#303741;
+  --color-border-accent:#579ef2;
+  --color-accent:#60a5fa;
+  --color-accent-strong:#93c5fd;
+  --color-on-accent:#071a31;
+  --color-text-muted:#7f8388;
+  --color-text-secondary:#929ba7;
+  --color-text-label:#a1aab5;
+  --color-text-table:#b0b8c2;
+  --color-text-primary:#cbd1d9;
+  --color-text-strong:#d4d9e0;
+  --color-info-surface:var(--color-accent-soft);
+  --color-info-text:var(--color-accent-strong);
+  --color-critical-surface:#351e24;
+  --color-critical-text:#f3a6ac;
+  --color-warning-surface:#241f16;
+  --color-warning-border:#65532d;
+  --color-warning-text:#e4c786;
+  --color-warning-muted:#af9b79;
+  --color-danger:#ff514d;
+  --color-success:#16a34a;
+  --color-warning-indicator:#d29922;
+  --color-inverse-danger:#b91c1c;
+  --color-primary:#0072ff;
+  --color-divider:#ffffff0d;
+
+  /* Compatibility names for table hover, network blocks and light tables. */
+}
+:root[data-theme="light"],[data-ui-theme="light"]{
+  --color-page:#f8f9fb;
+  --color-surface:var(--color-white);
+  --color-secondary:#f5f6f8;
+  --color-secondary-hover:#eff1f4;
+  --color-secondary-active:#e8ecf0;
+  --color-accent-soft:#e7f0ff;
+  --color-accent-selected:#d8e8ff;
+  --color-border-subtle:#e7eaee;
+  --color-border:#dfe4e9;
+  --color-border-accent:#83b1ed;
+  --color-accent:#2563eb;
+  --color-accent-strong:#1d4ed8;
+  --color-on-accent:var(--color-white);
+  --color-text-muted:#767676;
+  --color-text-secondary:#68717e;
+  --color-text-label:#626b78;
+  --color-text-table:#4e5865;
+  --color-text-primary:#303843;
+  --color-text-strong:#262e39;
+  --color-info-surface:var(--color-accent-soft);
+  --color-info-text:#1d4e89;
+  --color-critical-surface:#f8d7da;
+  --color-critical-text:#842029;
+  --color-warning-surface:#fff8e7;
+  --color-warning-border:#757d89;
+  --color-warning-text:#75510b;
+  --color-warning-muted:#776333;
+  --color-danger:#dc3545;
+  --color-warning-indicator:#b45309;
+  --color-inverse-danger:#fca5a5;
+  --color-primary:var(--color-accent);
+  --color-divider:#172b4010;
+}
+
+/* Re-resolve aliases for isolated theme previews as well as the app root. */
+:root,[data-ui-theme]{
+  --color-inverse-success:var(--color-success);
+  --color-on-primary:var(--color-white);
+  --color-on-secondary:var(--color-text-primary);
+  --toast-bg:var(--color-text-primary);
+  --toast-fg:var(--color-on-accent);
+  --toast-border:color-mix(in srgb,var(--toast-fg) 18%,transparent);
+  --toast-error:var(--color-inverse-danger);
+  --toast-success:var(--color-success);
+  --control-outline:color-mix(in srgb,var(--color-text-primary) 14%,transparent);
+  --palette-9:var(--color-secondary);
+  --palette-30:var(--color-accent-strong);
+  --palette-39:var(--color-text-table);
+}
