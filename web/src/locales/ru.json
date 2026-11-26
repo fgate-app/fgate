@@ -2386,5 +2386,14 @@
   "Downloading component": "Загрузка компонента",
   "Building component": "Сборка компонента",
   "Tor download requires a working gateway.": "Для загрузки Tor нужен работающий шлюз.",
-  "Could not download Tor through the available gateways.": "Не удалось загрузить Tor через доступные шлюзы."
+  "Could not download Tor through the available gateways.": "Не удалось загрузить Tor через доступные шлюзы.",
+  "Preparing components": "Подготовка компонентов",
+  "Checking module files": "Проверка файлов модуля",
+  "Extracting component": "Распаковка компонента",
+  "Checking component": "Проверка компонента",
+  "Packaging component": "Подготовка комплекта",
+  "Component is ready": "Компонент готов",
+  "Direct download": "Загрузка напрямую",
+  "Download through a gateway": "Загрузка через шлюз",
+  "Could not download Tor directly or through the available gateways.": "Не удалось загрузить Tor напрямую и через доступные шлюзы."
 }

@@ -2503,5 +2503,14 @@
   "Downloading component": "下载组件",
   "Building component": "构建组件",
   "Tor download requires a working gateway.": "下载 Tor 需要可用的网关。",
-  "Could not download Tor through the available gateways.": "无法通过可用网关下载 Tor。"
+  "Could not download Tor through the available gateways.": "无法通过可用网关下载 Tor。",
+  "Preparing components": "准备组件",
+  "Checking module files": "检查模块文件",
+  "Extracting component": "解压组件",
+  "Checking component": "验证组件",
+  "Packaging component": "准备组件包",
+  "Component is ready": "组件已就绪",
+  "Direct download": "直接下载",
+  "Download through a gateway": "通过网关下载",
+  "Could not download Tor directly or through the available gateways.": "无法直接或通过可用网关下载 Tor。"
 }

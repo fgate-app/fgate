@@ -1,4 +1,4 @@
-import hashlib,importlib.util,json,pathlib,shutil,sys,tempfile,unittest
+import os,subprocess,hashlib,importlib.util,json,pathlib,shutil,sys,tempfile,unittest
 ROOT=pathlib.Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
 spec=importlib.util.spec_from_file_location('reuse_modules',ROOT/'scripts/reuse-release-modules.py');reuse=importlib.util.module_from_spec(spec);spec.loader.exec_module(reuse)
 class ReuseTests(unittest.TestCase):
@@ -26,6 +26,20 @@ class ReuseTests(unittest.TestCase):
   (self.target/'server/outline/main.go').write_text('changed');self.assertEqual(set(reuse.reuse(self.source,self.target,'linux-arm64')),{'tor','lantern'})
  def test_changed_tor_lock_does_not_copy_old_tor(self):
   p=self.target/'packaging/tor.lock.json';data=json.loads(p.read_text());data['version']='2';p.write_text(json.dumps(data));self.assertNotIn('tor',reuse.reuse(self.source,self.target,'linux-arm64'))
+ def test_progress_logging_and_node_only_changes_do_not_rebuild_modules(self):
+  p=self.target/'scripts/build-lantern.py';p.write_text(p.read_text()+"\nmodule_stage('lantern','building',35)\n")
+  (self.target/'scripts/install_support.py').write_text('new download adapter')
+  (self.target/'packaging/runtime.lock.json').write_text(json.dumps({'go':'1','node':'new'}))
+  self.assertEqual(set(reuse.reuse(self.source,self.target,'linux-arm64')),{'tor','lantern','outline'})
+ def test_verified_regular_binary_and_manifest_are_not_rewritten(self):
+  root=pathlib.Path(self.tmp.name)/'cli';(root/'scripts').mkdir(parents=True);(root/'packaging').mkdir()
+  for name in ['fetch-modules.py','install_support.py']:shutil.copy2(ROOT/'scripts'/name,root/'scripts'/name)
+  module={'id':'mihomo','version':'v1','asset':'module.gz','repository':'fixture/repo','binary':'mihomo','format':'gzip','sha256':'a'*64,'platforms':{'linux-arm64':{'asset':'module.gz','sha256':'a'*64}}}
+  (root/'packaging/modules.lock.json').write_text(json.dumps({'modules':[module]}));folder=root/'modules/mihomo/v1';folder.mkdir(parents=True);binary=folder/'mihomo';binary.write_bytes(b'installed binary');manifest=folder/'manifest.json';manifest.write_text(json.dumps({**module,'platform':'linux-arm64','binarySha256':hashlib.sha256(binary.read_bytes()).hexdigest()}));before=[p.stat().st_mtime_ns for p in [binary,manifest]]
+  (root/'sitecustomize.py').write_text("import urllib.request\ndef forbidden(*a,**k):raise AssertionError('Unexpected download')\nurllib.request.urlopen=forbidden\n")
+  env={k:v for k,v in os.environ.items() if not k.startswith('FREEDOMGATE_RESOURCE_')};env['PYTHONPATH']=str(root)
+  result=subprocess.run([sys.executable,str(root/'scripts/fetch-modules.py'),'--platform','linux-arm64','--output',str(root/'modules')],env=env,capture_output=True,text=True)
+  self.assertEqual(result.returncode,0,result.stderr);self.assertEqual(before,[p.stat().st_mtime_ns for p in [binary,manifest]])
  def test_tampered_or_wrong_architecture_cache_is_rejected(self):
   (self.source/'server/outline/bin/linux-arm64/outline-bridge').write_bytes(b'bad');self.assertEqual(reuse.reuse(self.source,self.target,'linux-arm64'),[]);self.assertEqual(reuse.reuse(self.source,self.target,'linux-amd64'),[])
 if __name__=='__main__':unittest.main()

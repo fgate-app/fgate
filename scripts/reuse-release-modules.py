@@ -15,7 +15,12 @@ def fingerprint(root,names):
             relative=file.relative_to(root)
             if any(part in ['bin','__pycache__','.git'] for part in relative.parts) or file.name.startswith('._') or file.name=='.DS_Store' or str(relative)=='server/outline/README.md':continue
             if file.is_symlink():raise ValueError('Module build input is a link')
-            if file.is_file():digest.update(str(relative).encode()+b'\0');digest.update(file.read_bytes())
+            if file.is_file():
+                data=file.read_bytes()
+                if str(relative)=='packaging/runtime.lock.json':data=json.dumps(json.loads(data).get('go'),sort_keys=True).encode()
+                if file.name in ['build-lantern.py','build-outline.sh']:
+                    text=data.decode();text='\n'.join(line for line in text.splitlines() if 'module_stage(' not in line and 'FG_MODULE_STAGE' not in line);data=text.replace(',module_stage','').encode()
+                digest.update(str(relative).encode()+b'\0');digest.update(data)
     return digest.hexdigest()
 
 def reuse(source,target,platform):
@@ -23,9 +28,9 @@ def reuse(source,target,platform):
     try:bundles.verify(source,platform)
     except (ValueError,OSError,KeyError):return result
     inputs={
-        'tor':['packaging/tor.lock.json','scripts/fetch-tor.py','scripts/install_support.py'],
-        'lantern':['packaging/lantern.lock.json','packaging/runtime.lock.json','server/lantern','scripts/build-lantern.py','scripts/install_support.py'],
-        'outline':['packaging/runtime.lock.json','server/outline','scripts/build-outline.sh','scripts/install_support.py'],
+        'tor':['packaging/tor.lock.json','scripts/fetch-tor.py'],
+        'lantern':['packaging/lantern.lock.json','packaging/runtime.lock.json','server/lantern','scripts/build-lantern.py'],
+        'outline':['packaging/runtime.lock.json','server/outline','scripts/build-outline.sh'],
     }
     old=bundles.layout(source,platform);new=bundles.layout(target,platform)
     for name,names in inputs.items():

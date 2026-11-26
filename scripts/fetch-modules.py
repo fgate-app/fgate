@@ -3,7 +3,7 @@
 import platform
 import argparse, gzip, json, pathlib, shutil, tarfile, zipfile
 
-from install_support import digest,verified_download,initial_link,public_directory,public_tree
+from install_support import digest,verified_download,initial_link,public_directory,public_tree,module_stage
 
 def main():
     parser=argparse.ArgumentParser()
@@ -21,12 +21,22 @@ def main():
         module={**original,**platform_asset}
         folder=args.output/module['id']/module['version']
         public_directory(folder,args.output)
+        module_stage(module['id'],'checking',5)
+        existing=folder/'manifest.json'
+        if existing.is_file():
+            try:cached=json.loads(existing.read_text())
+            except ValueError:cached={}
+            binary=folder/module['binary']
+            if cached.get('sha256')==module['sha256'] and cached.get('platform')==args.platform and binary.is_file() and cached.get('binarySha256')==digest(binary):
+                manifest.append(cached);initial_link(args.output/module['id']/'current',module['version']);module_stage(module['id'],'reuse',100);continue
         archive=folder/module['asset']
         url=f"https://github.com/{module['repository']}/releases/download/{module['version']}/{module['asset']}"
         if not archive.exists() or digest(archive)!=module['sha256']:
             pending=folder/(module['asset']+'.part')
+            module_stage(module['id'],'downloading',20)
             verified_download(url,pending,module['sha256'])
             pending.replace(archive)
+        module_stage(module['id'],'extracting',70)
         target=folder/module['binary']
         temporary=folder/(module['binary']+'.next')
         with temporary.open('wb') as out:
@@ -46,6 +56,7 @@ def main():
         public_tree(folder)
         initial_link(args.output/module['id']/'current',module['version'])
         manifest.append(record)
+        module_stage(module['id'],'complete',100)
         print(module['id']+' '+module['version']+': SHA256 verified; staged, not activated',flush=True)
     (args.output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     (args.output/'manifest.json').chmod(0o644)

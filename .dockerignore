@@ -68,3 +68,7 @@ server/tor/bin
 !scripts/system-update-worker.mjs
 
 !scripts/reuse-release-modules.py
+
+!scripts/fetch-update-resource.mjs
+
+!scripts/configure-build-network.mjs

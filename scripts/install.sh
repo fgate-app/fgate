@@ -16,6 +16,7 @@ restart_gateway() {
 
 rollback_install() {
  install_exit=$?
+ if [ -n "${FREEDOMGATE_BUILD_PROXY:-}" ];then node "$ROOT/scripts/configure-build-network.mjs" restore "$ROOT" || true;fi
  trap - EXIT HUP INT TERM
  if [ "$install_committed" != 1 ];then
   echo 'Installation did not complete; restoring installer-owned runtime, units and application.' >&2
@@ -133,7 +134,9 @@ trap 'exit 130' INT
 trap 'exit 143' HUP TERM
 PATH="$node_dir/bin:$PATH";export PATH
 update_stage web
-if [ ! -f web/dist/index.html ] || [ ! -f node_modules/yaml/package.json ];then npm ci --ignore-scripts;fi
+if [ -n "${FREEDOMGATE_BUILD_PROXY:-}" ];then node scripts/configure-build-network.mjs prepare "$ROOT";fi
+if [ ! -f web/dist/index.html ] || [ ! -f node_modules/yaml/package.json ];then npm ci --ignore-scripts --no-audit --fund=false;fi
+if [ -n "${FREEDOMGATE_BUILD_PROXY:-}" ];then node scripts/configure-build-network.mjs restore "$ROOT";fi
 if [ ! -f web/dist/index.html ];then npm run build;fi
 update_stage frp
 python3 scripts/fetch-access-modules.py --platform linux-arm64 --platform linux-amd64

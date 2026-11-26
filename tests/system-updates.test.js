@@ -66,3 +66,27 @@ test('resource downloader can prohibit every direct attempt',async()=>{
  const get=createResourceFetch({gateways:()=>[gateway],allowDirect:false,request:async(_url,{gateway})=>{paths.push(gateway?.id);return {status:200,headers:new Headers(),body:Buffer.from('ok')};}});await get('https://example.com/');assert.deepEqual(paths,['known']);
  await assert.rejects(createResourceFetch({allowDirect:false})('https://example.com/'),/unavailable/);
 });
+
+test('fallback is retried independently per resource, including checksum rejection',async()=>{
+ const {createResourceFetch}=await import('../server/resource-fetch.js');const calls=[];
+ const gateways=['a','b'].map((id,i)=>({id,port:28000+i,secret:'x'.repeat(20)}));
+ const get=createResourceFetch({gateways:()=>gateways,request:async(url,{gateway})=>{calls.push([url,gateway?.id||'direct']);if(!gateway)throw Error();return {status:200,headers:new Headers(),body:Buffer.from(url.endsWith('/a')||gateway.id==='b'?'good':'bad')};}});
+ for(const name of ['a','b'])await get('https://example.com/'+name,{validate:bytes=>{assert.equal(bytes.toString(),'good');}});
+ assert.deepEqual(calls.map(([url,id])=>[url.slice(-1),id]),[['a','direct'],['a','a'],['b','direct'],['b','a'],['b','b']]);
+});
+test('installer resource adapter validates its private route and preserves Go/npm content',async()=>{
+ const {startInstallerNetwork}=await import('../server/installer-network.js');const calls=[];
+ const network=await startInstallerNetwork({fetchImpl:async url=>{calls.push(url);return new Response('verified-content');}});
+ try{const base=network.environment.FREEDOMGATE_BUILD_PROXY;for(const path of ['go/example.org/module/@v/v1.zip','sumdb/lookup/example.org/module@v1','resource/'+Buffer.from('https://registry.npmjs.org/package.tgz').toString('base64url')])assert.equal(await(await fetch(base+path)).text(),'verified-content');assert.equal(calls[0],'https://proxy.golang.org/example.org/module/@v/v1.zip');assert.equal((await fetch(base.replace(/\/[a-f0-9]{48}\//,'/invalid/')+'go/foo')).status,404);
+ }finally{await network.close();}
+});
+test('npm adapter restores the exact original lockfile and keeps integrity checks',()=>fixture(async m=>{
+ const {execFile}=await import('node:child_process'),{promisify}=await import('node:util'),{readFile}=await import('node:fs/promises');const run=promisify(execFile);
+ const original=JSON.stringify({packages:{pkg:{resolved:'https://registry.npmjs.org/pkg.tgz',integrity:'sha512-original'}}});await writeFile(join(m.state,'package-lock.json'),original);
+ await run(process.execPath,['scripts/configure-build-network.mjs','prepare',m.state],{env:{...process.env,FREEDOMGATE_BUILD_PROXY:'http://127.0.0.1:30000/'+'a'.repeat(48)+'/'}});
+ const lock=JSON.parse(await readFile(join(m.state,'package-lock.json')));assert.equal(lock.packages.pkg.integrity,'sha512-original');assert.match(lock.packages.pkg.resolved,/127.0.0.1/);
+ await run(process.execPath,['scripts/configure-build-network.mjs','restore',m.state]);assert.equal(await readFile(join(m.state,'package-lock.json'),'utf8'),original);
+}));
+test('component progress accepts only bounded module events',async()=>{
+ const {componentProgress}=await import('../server/system-update-progress.js');assert.deepEqual(componentProgress('FG_MODULE_STAGE lantern building 35'),{id:'lantern',stage:'building',progress:35});assert.equal(componentProgress('FG_MODULE_STAGE shell building 35'),null);assert.equal(componentProgress('FG_MODULE_STAGE lantern building 101'),null);
+});

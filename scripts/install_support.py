@@ -1,4 +1,6 @@
 """Shared verified downloads and relocatable links for installation tools."""
+import os
+import subprocess
 import hashlib
 import pathlib
 import shutil
@@ -12,6 +14,10 @@ def digest(path):
 
 def verified_download(url, path, sha256):
     path = pathlib.Path(path)
+    if os.environ.get('FREEDOMGATE_RESOURCE_JOB'):
+        subprocess.run([os.environ['FREEDOMGATE_RESOURCE_NODE'],os.environ['FREEDOMGATE_RESOURCE_SCRIPT'],url,str(path),sha256],check=True)
+        if digest(path)!=sha256:raise ValueError('SHA-256 mismatch')
+        return
     request = urllib.request.Request(url, headers={'User-Agent': 'FreedomGate-installer'})
     try:
         with urllib.request.urlopen(request, timeout=120) as response, path.open('wb') as out:
@@ -58,3 +64,9 @@ def elf_architecture(path):
     machine = int.from_bytes(header[18:20], 'little' if header[5] == 1 else 'big')
     if machine not in (62, 183): raise ValueError('Unsupported module architecture')
     return {62: 'linux-amd64', 183: 'linux-arm64'}[machine]
+
+
+def module_stage(module, action, progress):
+    if module=='frp':progress=int(os.environ.get('FREEDOMGATE_MODULE_PROGRESS_BASE',0))+progress*int(os.environ.get('FREEDOMGATE_MODULE_PROGRESS_SPAN',100))//100
+    os.environ['FREEDOMGATE_ACTIVE_MODULE']=module
+    print(f'FG_MODULE_STAGE {module} {action} {progress}',flush=True)

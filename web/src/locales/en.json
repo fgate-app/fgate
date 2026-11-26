@@ -2386,5 +2386,14 @@
   "Downloading component": "Downloading component",
   "Building component": "Building component",
   "Tor download requires a working gateway.": "Tor download requires a working gateway.",
-  "Could not download Tor through the available gateways.": "Could not download Tor through the available gateways."
+  "Could not download Tor through the available gateways.": "Could not download Tor through the available gateways.",
+  "Preparing components": "Preparing components",
+  "Checking module files": "Checking module files",
+  "Extracting component": "Extracting component",
+  "Checking component": "Checking component",
+  "Packaging component": "Packaging component",
+  "Component is ready": "Component is ready",
+  "Direct download": "Direct download",
+  "Download through a gateway": "Download through a gateway",
+  "Could not download Tor directly or through the available gateways.": "Could not download Tor directly or through the available gateways."
 }

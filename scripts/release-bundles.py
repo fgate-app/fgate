@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prepare upstream modules at installation and verify installed release binaries."""
 import argparse,hashlib,json,pathlib,shutil,subprocess,tempfile
-from install_support import elf_architecture,public_tree
+from install_support import elf_architecture,public_tree,module_stage
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 TOR_FILES=['tor/tor','tor/libcrypto.so.3','tor/libssl.so.3','tor/libevent-2.1.so.7','tor/pluggable_transports/lyrebird','tor/pluggable_transports/pt_config.json','data/geoip','data/geoip6']
 def layout(root,platform):
@@ -36,6 +36,7 @@ def verify(root,platform):
 def prepare(root,platform):
  for id,(version,folder) in layout(root,platform).items():
   print('FG_UPDATE_STAGE '+id,flush=True)
+  module_stage(id,'reuse' if folder.exists() else 'downloading' if id=='tor' else 'building',100 if folder.exists() else 15)
   print('FG_UPDATE_ACTION '+('reuse' if folder.exists() else 'download' if id=='tor' else 'build'),flush=True)
   if id=='outline' and not (folder/'outline-bridge').is_file():subprocess.run(['sh',str(root/'scripts/build-outline.sh'),'linux',platform.split('-')[1]],check=True)
   if id=='lantern' and not folder.is_dir():subprocess.run(['python3',str(root/'scripts/build-lantern.py'),'--platform',platform,'--output',str(folder.parent)],check=True)
@@ -44,7 +45,7 @@ def prepare(root,platform):
     subprocess.run(['python3',str(root/'scripts/fetch-tor.py'),'--platform',platform,'--output',work],check=True)
     folder.parent.mkdir(parents=True,exist_ok=True);shutil.copytree(pathlib.Path(work)/'tor'/version,folder)
     (folder/'bundle.tar.gz').unlink(missing_ok=True)
-  public_tree(folder)
+  module_stage(id,'complete',100)
  data=inventory(root,platform);manifest=root/'packaging/release-bundles'/(platform+'.json');manifest.parent.mkdir(exist_ok=True);manifest.write_text(json.dumps(data,indent=2)+'\n');manifest.chmod(0o644);verify(root,platform)
 if __name__=='__main__':
  parser=argparse.ArgumentParser();parser.add_argument('--root',type=pathlib.Path,default=ROOT);parser.add_argument('--platform',required=True,choices=['linux-arm64','linux-amd64']);parser.add_argument('--prepare',action='store_true',help='Download/build pinned upstream modules for this platform');args=parser.parse_args()

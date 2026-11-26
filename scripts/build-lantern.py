@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build a pinned Lantern module; upstream's direct/proxyless paths are disabled."""
 import argparse,hashlib,json,os,pathlib,shutil,subprocess,tarfile,tempfile
-from install_support import elf_architecture,public_tree
+from install_support import elf_architecture,public_tree,module_stage
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 
 def replace_once(path,old,new):
@@ -58,14 +58,18 @@ def build(platform,output,source_archive=None):
     if target.exists():raise ValueError('Lantern build destination already exists')
     with tempfile.TemporaryDirectory(prefix='fg-lantern-build-') as temporary:
         work=pathlib.Path(temporary)
+        module_stage('lantern','checking',10)
         headless,flashlight,archive=prepare_sources(lock,work,source_archive)
         target.parent.mkdir(parents=True,exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='.lantern-',dir=target.parent) as stage:
             stage=pathlib.Path(stage);binary=stage/'lantern-headless'
+            module_stage('lantern','building',35)
             subprocess.run(['go','build','-mod=readonly','-trimpath','-buildvcs=false','-ldflags','-s -w -X github.com/getlantern/lantern-headless-client/shared.ApplicationVersion='+lock['version'],'-o',str(binary),'.'],cwd=headless,env=env,check=True)
+            module_stage('lantern','verifying',85)
             if elf_architecture(binary)!=platform:raise ValueError('Lantern binary has an unexpected architecture')
             shutil.copy2(headless/'LICENSE',stage/'COPYING.txt')
             (stage/'manifest.json').write_text(json.dumps({**lock,'platform':platform,'binarySha256':hashlib.sha256(binary.read_bytes()).hexdigest()},indent=2)+'\n')
+            module_stage('lantern','packaging',95)
             # Keep the modified sources and build recipe with this derived module.
             with tarfile.open(stage/'corresponding-source.tar.gz','w:gz') as source:
                 source.add(headless,arcname='source/'+headless.name);source.add(flashlight,arcname='flashlight-fg');source.add(ROOT/'scripts/build-lantern.py',arcname='scripts/build-lantern.py');source.add(ROOT/'server/lantern/upstream.go',arcname='server/lantern/upstream.go');source.add(ROOT/'scripts/install_support.py',arcname='scripts/install_support.py');source.add(ROOT/'packaging/lantern.lock.json',arcname='packaging/lantern.lock.json');source.add(archive,arcname='modified-source.tar.gz')

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Bundle official frp binaries; cache is bound to version, archive and file hashes."""
-import argparse,hashlib,io,json,pathlib,shutil,tarfile,tempfile,urllib.request
-from install_support import digest,public_directory,public_tree
+import os
+import argparse,hashlib,io,json,pathlib,shutil,tarfile,tempfile
+from install_support import digest,public_directory,public_tree,verified_download,module_stage
 ROOT=pathlib.Path(__file__).resolve().parent.parent/'server/access-points'
 NAMES=('frpc','frps','LICENSE')
 def valid_cache(target,version,sha256):
@@ -13,13 +14,16 @@ def valid_cache(target,version,sha256):
 def main():
     lock=json.loads((ROOT/'assets.json').read_text())
     parser=argparse.ArgumentParser();parser.add_argument('--platform',action='append',choices=list(lock['assets']));args=parser.parse_args()
-    for platform,sha256 in lock['assets'].items():
-        if args.platform and platform not in args.platform:continue
+    selected=[(platform,sha) for platform,sha in lock['assets'].items() if not args.platform or platform in args.platform]
+    for index,(platform,sha256) in enumerate(selected):
+        os.environ['FREEDOMGATE_MODULE_PROGRESS_BASE']=str(index*100//len(selected));os.environ['FREEDOMGATE_MODULE_PROGRESS_SPAN']=str(100//len(selected))
         target=ROOT/'bin'/platform;public_directory(target.parent,ROOT/'bin')
-        if valid_cache(target,lock['version'],sha256):public_tree(target);continue
+        if valid_cache(target,lock['version'],sha256):module_stage('frp','reuse',100);continue
         asset='frp_'+lock['version']+'_'+platform.replace('-','_')
         url='https://github.com/'+lock['repository']+'/releases/download/v'+lock['version']+'/'+asset+'.tar.gz'
-        with urllib.request.urlopen(url,timeout=90) as response:data=response.read(128*1024*1024+1)
+        module_stage('frp','downloading',20)
+        with tempfile.TemporaryDirectory() as download:
+            path=pathlib.Path(download)/'frp.tar.gz';verified_download(url,path,sha256);data=path.read_bytes()
         if len(data)>128*1024*1024 or hashlib.sha256(data).hexdigest()!=sha256:raise ValueError('frp checksum mismatch: '+platform)
         with tempfile.TemporaryDirectory(prefix='.stage-',dir=target.parent) as work:
             staged=pathlib.Path(work)/'module';staged.mkdir()
@@ -36,5 +40,6 @@ def main():
             except BaseException:
                 if old.exists():old.rename(target)
                 raise
+        module_stage('frp','complete',100)
         print('Verified frp '+lock['version']+': '+platform)
 if __name__=='__main__':main()

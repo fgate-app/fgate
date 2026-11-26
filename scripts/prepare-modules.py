@@ -9,16 +9,17 @@ import subprocess
 import tarfile
 import tempfile
 
-from install_support import initial_link, verified_download, public_directory, public_tree, elf_architecture
+from install_support import initial_link, verified_download, public_directory, public_tree, elf_architecture,module_stage
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 def build_zapret(module, output, platform):
+    module_stage('zapret','checking',5)
     target = output / 'zapret2' / module['commit']
     public_directory(target.parent,output)
     if (target / 'nfqws2').exists() and (target / 'lua').is_dir():
-        public_tree(target)
+        module_stage('zapret','reuse',100)
         return
 
     with tempfile.TemporaryDirectory() as work:
@@ -29,6 +30,7 @@ def build_zapret(module, output, platform):
         with tarfile.open(archive) as bundle:
             bundle.extractall(work / 'src', filter='data')
         source = next((work / 'src').iterdir())
+        module_stage('zapret','building',40)
         subprocess.run(['make', '-j2'], cwd=source, check=True)
 
         # Publish only a complete build; failed copies never become active.
@@ -44,6 +46,7 @@ def build_zapret(module, output, platform):
                 shutil.rmtree(target)
             staged.replace(target)
             public_tree(target)
+            module_stage('zapret','complete',100)
 
 
 def main():
