@@ -51,3 +51,19 @@ test('settings read old sources offline and reject stale usage on save; failed a
 test('subscription usage includes routes and groups reached through nested parents',()=>fixture(async({store,service})=>{
  const profile=store.importProfile({value:socks}),child=store.saveConnectionGroup(null,{name:'Europa',members:[profile.id]}),parent=store.saveConnectionGroup(null,{name:'VPN',members:[child.id]});store.addRouteGroup({name:'Nested route',entries:['example.org'],routeId:parent.id});const usage=service.usage(profile.id);assert.deepEqual(new Set(usage.groups),new Set(['Europa','VPN']));assert.deepEqual(usage.routes,['Nested route']);
 }));
+test('provider endpoint rotation updates existing IDs, routes, groups, switches and custom names',()=>fixture(async({store,service,set})=>{
+ const p=await preview(service),source=await service.save(null,{token:p.token,selected:p.selected}),member=service.repository.get(source.id).members[0],id=member.profileId;
+ store.updateProfile(id,{name:'My gateway',enabled:true});const rule=store.addRouteGroup({name:'Sites',entries:['example.org'],routeId:id}),group=store.saveConnectionGroup(null,{name:'VPN',members:[id]});
+ set(vless().replace('proxy.example.com:443','rotated.example.com:8443').replace('%2Fpath','%2Fnew')+'\n'+socks);await service.refresh(source.id);
+ const snapshot=store.profileSnapshot(id),saved=service.repository.get(source.id);assert.ok(snapshot.config.config.includes('rotated.example.com'));assert.equal(snapshot.profile.name,'My gateway');assert.equal(snapshot.profile.enabled,1);assert.equal(saved.members[0].key,member.key);assert.equal(saved.members[0].missing,false);assert.equal(store.routeGroup(rule.id).routeId,id);assert.deepEqual(store.connectionGroups().find(g=>g.id===group.id).members,[id]);assert.equal(saved.members.length,2);
+}));
+test('cached rotation repair preserves manual switches and does not invent ambiguous matches',()=>fixture(async({store,service,set})=>{
+ const p=await preview(service),source=await service.save(null,{token:p.token,selected:[p.records[0].key]}),row=service.repository.get(source.id),id=row.members[0].profileId;
+ set(vless().replace('proxy.example.com','new.example.com'));row.secrets.records=await service.download(row.secrets.url);row.members[0].missing=true;service.repository.save(row);
+ await service.sync(row,service.cachedRecords(row),{downloaded:false});assert.equal(service.membership().get(id).subscriptionMissing,false);assert.equal(store.profileSnapshot(id).profile.enabled,0);assert.ok(store.profileSnapshot(id).config.config.includes('new.example.com'));
+ set(vless().replace('proxy.example.com','first.example.com')+'\n'+vless().replace('proxy.example.com','second.example.com'));await service.refresh(source.id);assert.equal(service.membership().get(id).subscriptionMissing,true);assert.ok(store.profileSnapshot(id).config.config.includes('new.example.com'));
+}));
+test('rotation apply failure restores old configs and subscription membership',()=>fixture(async({store,service,set})=>{
+ const p=await preview(service),source=await service.save(null,{token:p.token,selected:p.selected}),before=service.repository.get(source.id),snapshots=before.members.map(m=>store.profileSnapshot(m.profileId));
+ set(vless().replace('proxy.example.com','rotated.example.com')+'\n'+socks);service.apply=async()=>{throw Error('apply failed');};await assert.rejects(service.refresh(source.id));assert.deepEqual(before.members,service.repository.get(source.id).members);assert.deepEqual(snapshots,before.members.map(m=>store.profileSnapshot(m.profileId)));
+}));

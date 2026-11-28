@@ -1,3 +1,4 @@
+import {runJsonWorker,gatewayCurlConfig} from './json-worker.js';
 import {followDiagnosticRedirects,validRedirectUrl,redirectLimits} from './diagnostic-redirects.js';
 import {validDiagnosticUrl} from '../shared/diagnostic-targets.js';
 import {spawn} from 'node:child_process';
@@ -19,26 +20,14 @@ export function diagnosticPath(profiles, id) {
 }
 
 export function requestDiagnostic(endpoint,url,{signal,spawnProcess=spawn,localPort,redirectHop=false,timeoutMs=httpsDiagnosticLimits.attemptSeconds*1000}={}) {
-  return new Promise((resolve,reject)=>{
-    if(!httpHealthUrls.includes(url) && !validDiagnosticUrl(url) && !(redirectHop && validRedirectUrl(url)))return reject(Error('Invalid diagnostic target.'));
-    if(localPort!==undefined && (!Number.isInteger(localPort) || localPort<1024 || localPort>65535))return reject(Error('Invalid local port.'));
-    const child=spawnProcess('curl',['--disable','--config','-','--silent','--noproxy','','--proto','=https',
+  return (async()=>{
+    if(!httpHealthUrls.includes(url) && !validDiagnosticUrl(url) && !(redirectHop && validRedirectUrl(url)))throw Error('Invalid diagnostic target.');
+    if(localPort!==undefined && (!Number.isInteger(localPort) || localPort<1024 || localPort>65535))throw Error('Invalid local port.');
+    try{const {value,exitCode}=await runJsonWorker('curl',['--disable','--config','-','--silent','--noproxy','','--proto','=https',
       ...(localPort?['--local-port',String(localPort)]:[]),
-      '--connect-timeout',String(httpsDiagnosticLimits.connectSeconds),'--max-time',String(Math.min(httpsDiagnosticLimits.attemptSeconds,timeoutMs/1000)),'--max-filesize',String(httpsDiagnosticLimits.maxResponseBytes),'--output','/dev/null','--write-out','%{json}'],{stdio:['pipe','pipe','pipe']});
-    let done=false,size=0,chunks=[];
-    const finish=(error,value)=>{if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);error?reject(error):resolve(value);};
-    const abort=()=>{child.kill('SIGKILL');finish(Object.assign(Error('Diagnostic cancelled.'),{code:'ABORTED'}));};
-    const timer=setTimeout(()=>{child.kill('SIGKILL');finish(Object.assign(Error('Diagnostic timed out.'),{code:'TIMEOUT'}));},httpsDiagnosticLimits.workerSeconds*1000);
-    signal?.addEventListener('abort',abort,{once:true});
-    child.on('error',()=>finish(Object.assign(Error('Diagnostic transport is unavailable.'),{code:'UNAVAILABLE'})));
-    child.stdout.on('data',chunk=>{size+=chunk.length;if(size>65536){child.kill('SIGKILL');finish(Error('Invalid transport response.'));return;}chunks.push(chunk);});
-    // Neither stderr nor curl's JSON is exposed: both may contain proxy details.
-    child.stderr.resume();
-    child.on('close',code=>{if(done)return;try{finish(null,{...JSON.parse(Buffer.concat(chunks).toString()),exitCode:code});}catch{finish(Object.assign(Error('Invalid transport response.'),{code:'UNAVAILABLE'}));}});
-    child.stdin.on('error',()=>{});
-    if(signal?.aborted){abort();return;}
-    child.stdin.end(`proxy = "${endpoint.type==='socks5'?'socks5h':'http'}://127.0.0.1:${endpoint.port}"\nproxy-user = ${JSON.stringify('fg-geo:'+endpoint.secret)}\nurl = ${JSON.stringify(url)}\n`);
-  });
+      '--connect-timeout',String(httpsDiagnosticLimits.connectSeconds),'--max-time',String(Math.min(httpsDiagnosticLimits.attemptSeconds,timeoutMs/1000)),'--max-filesize',String(httpsDiagnosticLimits.maxResponseBytes),'--output','/dev/null','--write-out','%{json}'],{input:gatewayCurlConfig(endpoint,url),signal,spawnProcess,timeoutMs:httpsDiagnosticLimits.workerSeconds*1000});return {...value,exitCode};}
+    catch(error){if(error.code==='ABORTED')throw error;throw Object.assign(Error(error.code==='TIMEOUT'?'Diagnostic timed out.':error.code==='INVALID_RESPONSE'?'Invalid transport response.':'Diagnostic transport is unavailable.'),{code:error.code==='TIMEOUT'?'TIMEOUT':'UNAVAILABLE'});}
+  })();
 }
 
 const milliseconds=value=>Number.isFinite(value) && value>=0?Math.round(value*1000):null;

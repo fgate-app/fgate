@@ -1,9 +1,13 @@
+import {xhttpFields,isXhttp,patchXhttp} from './xray-xhttp.js';
+import {xrayMuxFields,xrayMuxFromDraft} from './xray-mux.js';
+import {xraySecurityFields,securityFieldVisible,xraySecuritySettings} from './xray-security.js';
+import {validateVlessTransport} from './vless-transport.js';
 import {mihomoTypes,nativePrefix,mihomoFields,mihomoFromDraft} from './mihomo-proxy.js';
 import {hysteria2Fields,normalizeHysteria2} from './hysteria2.js';
 export const proxyTypes=[{value:'vless',label:'VLESS'},{value:'ss',label:'Shadowsocks / Outline'},{value:'socks5',label:'SOCKS5'},{value:'hysteria2',label:'Hysteria 2'},{value:'wireguard',label:'WireGuard'},{value:'openvpn',label:'OpenVPN'}];
 export const manualFields={
  hysteria2:hysteria2Fields,
- vless:['server','port','uuid','security','sni','fingerprint','publicKey','shortId','flow','network','path','host','serviceName'],
+ vless:['server','port','uuid','encryption','security','sni','fingerprint','publicKey','shortId','flow','network','path','host','serviceName',...xraySecurityFields,...xrayMuxFields,...xhttpFields],
  ss:['server','port','cipher','password','prefix'],
  socks5:['server','port','username','password'],
  wireguard:['server','port','private-key','public-key','pre-shared-key','ip','ipv6','allowed-ips'],
@@ -13,10 +17,13 @@ const nativeLabels={ss:'Shadowsocks',ssr:'ShadowsocksR',socks5:'SOCKS5',http:'HT
 for(const type of mihomoTypes){proxyTypes.push({value:nativePrefix+type,label:nativeLabels[type]+(proxyTypes.some(item=>item.value===type)?' (mihomo)':'')});manualFields[nativePrefix+type]=mihomoFields(type);}
 export const fieldLabels={server:'Сервер',port:'Порт',uuid:'UUID',security:'Защита',sni:'SNI',fingerprint:'Fingerprint',publicKey:'Публичный ключ Reality',shortId:'Short ID',flow:'Flow',network:'Транспорт',path:'Путь',host:'Host',serviceName:'Имя сервиса gRPC',prefix:'Prefix (hex)',cipher:'Шифр',password:'Пароль',username:'Логин','private-key':'Приватный ключ','public-key':'Публичный ключ','pre-shared-key':'Preshared key',ip:'IPv4 интерфейса',ipv6:'IPv6 интерфейса','allowed-ips':'AllowedIPs',proto:'Протокол',ca:'CA сертификат',cert:'Сертификат клиента',key:'Приватный ключ клиента','tls-auth':'TLS Auth','key-direction':'Направление ключа','tls-crypt':'TLS Crypt',auth:'Алгоритм аутентификации','skip-cert-verify':'Skip certificate verification',obfs:'Obfuscation','obfs-password':'Obfuscation password'};
 Object.assign(fieldLabels,{'psk':'Pre-shared key','token':'Token','protocol':'Protocol','servername':'Server name','tls':'TLS','udp':'UDP','auth-str':'Authentication','up':'Upload bandwidth','down':'Download bandwidth','transport':'Transport','network-name':'Network name','network-secret':'Network secret','hostname':'Hostname','auth-key':'Authentication key','exit-node':'Exit node','skip-cert-verify':'Skip certificate verification'});
-export const fieldOptions={obfs:['','salamander'],security:['none','tls','reality'],network:['tcp','raw','ws','grpc','httpupgrade','xhttp','splithttp'],proto:['udp','tcp'],cipher:['chacha20-ietf-poly1305','aes-128-gcm','aes-256-gcm','2022-blake3-aes-128-gcm','2022-blake3-aes-256-gcm'],flow:['','xtls-rprx-vision']};
+export const fieldOptions={xhttpMode:['auto','packet-up','stream-up','stream-one'],muxUdp443:['reject','allow','skip'],obfs:['','salamander'],security:['none','tls','reality'],network:['tcp','raw','ws','grpc','httpupgrade','xhttp','splithttp'],proto:['udp','tcp'],cipher:['chacha20-ietf-poly1305','aes-128-gcm','aes-256-gcm','2022-blake3-aes-128-gcm','2022-blake3-aes-256-gcm'],flow:['','xtls-rprx-vision']};
 export function visibleFields(type,draft){return (manualFields[type] || []).filter(f=>{
  if(type==='hysteria2')return f!=='obfs-password' || draft.obfs==='salamander';
  if(type!=='vless')return true;
+ if(xhttpFields.includes(f))return isXhttp(draft.network);
+ if(xrayMuxFields.includes(f))return f==='muxEnabled' || draft.muxEnabled==='true';
+ if(xraySecurityFields.includes(f))return securityFieldVisible(f,draft.security);
  if(['sni','fingerprint'].includes(f))return draft.security!=='none';
  if(['publicKey','shortId'].includes(f))return draft.security==='reality';
  if(['path','host'].includes(f))return ['ws','httpupgrade','xhttp','splithttp'].includes(draft.network);
@@ -33,10 +40,26 @@ export function manualConfig(type,draft){
  }
  const authority=(server.includes(':')?'['+server+']':server)+':'+port;
  if(type==='vless'){
+  const vlessEncryption=draft.encryption===undefined?'none':draft.encryption;
+  validateVlessTransport({network:draft.network || 'tcp',security:draft.security || 'none',flow:draft.flow || '',encryption:vlessEncryption});
   if(!draft.uuid?.trim())throw new Error("Enter a UUID.");
   if(draft.security==='reality' && !draft.publicKey?.trim())throw new Error("Enter the Reality public key.");
-  const q=new URLSearchParams({security:draft.security || 'none',type:draft.network || 'tcp'});
+  const advanced=xraySecuritySettings(draft);
+  const xhttp=isXhttp(draft.network)?patchXhttp({path:draft.path || '/',host:draft.host || ''},draft):null;
+  if(draft.muxEnabled==='true'){
+   const network=draft.network || 'tcp',security=draft.security || 'none',streamSettings={network,security,...advanced};
+   if(security==='tls')streamSettings.tlsSettings={serverName:draft.sni || server,fingerprint:draft.fingerprint || 'chrome',...advanced.tlsSettings};
+   if(security==='reality')streamSettings.realitySettings={serverName:draft.sni || '',fingerprint:draft.fingerprint || 'chrome',publicKey:draft.publicKey,shortId:draft.shortId || '',...advanced.realitySettings};
+   if(network==='ws')streamSettings.wsSettings={path:draft.path || '/',headers:{Host:draft.host || server}};
+   if(network==='httpupgrade')streamSettings.httpupgradeSettings={path:draft.path || '/',host:draft.host || ''};
+   if(network==='grpc')streamSettings.grpcSettings={serviceName:draft.serviceName || ''};
+   if(['xhttp','splithttp'].includes(network))streamSettings.xhttpSettings=xhttp;
+   return JSON.stringify({outbounds:[{protocol:'vless',settings:{vnext:[{address:server,port,users:[{id:draft.uuid,encryption:vlessEncryption,...(draft.flow?{flow:draft.flow}:{})}]}]},streamSettings,mux:xrayMuxFromDraft(draft)}]});
+  }
+  const q=new URLSearchParams({encryption:vlessEncryption,security:draft.security || 'none',type:draft.network || 'tcp'});
   for(const [f,k] of Object.entries({sni:'sni',fingerprint:'fp',publicKey:'pbk',shortId:'sid',flow:'flow',path:'path',host:'host',serviceName:'serviceName'}))if(visibleFields(type,draft).includes(f) && draft[f])q.set(k,draft[f]);
+  if(xhttp){q.set('mode',xhttp.mode);const extra=Object.fromEntries(Object.entries(xhttp).filter(([k])=>!['path','host','mode'].includes(k)));if(Object.keys(extra).length)q.set('extra',JSON.stringify(extra));}
+  for(const [key,value] of Object.entries(advanced.tlsSettings || advanced.realitySettings || {}))q.set(key,Array.isArray(value)?value.join(','):value);
   return 'vless://'+encodeURIComponent(draft.uuid)+'@'+authority+'?'+q;
  }
  if(type==='ss'){

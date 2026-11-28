@@ -1,0 +1,3 @@
+const uuid='00000000-0000-4000-8000-000000000001';
+export const combinations=['tcp','raw','ws','grpc','httpupgrade','xhttp','splithttp'].flatMap(network=>['none','tls','reality'].filter(security=>security!=='reality' || !['ws','httpupgrade'].includes(network)).map(security=>({network,security})));
+export function uri({network,security}){return `vless://${uuid}@vpn.example:443?`+new URLSearchParams({type:network,security,sni:'tls.example',fp:'firefox',pbk:'fixture-key',sid:'0123456789abcdef',spx:'/spider',path:'/путь?ed=2048',host:'edge.example',serviceName:'grpc-service',mode:network==='grpc'?'multi':'packet-up',authority:'grpc.example',alpn:'h2,http/1.1',allowInsecure:'false'});}

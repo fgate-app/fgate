@@ -58,7 +58,7 @@ const delay = milliseconds => new Promise(resolve => setTimeout(resolve, millise
 // loopback-only mixed port. Client traffic is captured by the TUN.
 export function buildMihomoConfig(settings, { mixedPort = 7890, dnsPort = 15353, lanSubnets = [], controllerPort = 19090, controllerSecret = randomBytes(32).toString('hex'), onRuleOwners = null, onLocationListeners = null, locationPorts = null, remoteAccessEnabled = false, remoteUsers = [], remotePort = 17990, wrapperEndpoints = new Map() } = {}, routes = { devices: [], groups: [], profiles: [], configs: [] }) {
   routes={...routes,groups:routes.groups.filter(rule=>rule.enabled!==false),devices:routes.devices.filter(rule=>rule.enabled!==false),profiles:routes.profiles.map(profile=>profile.engine==='direct'?{...profile,enabled:true}:profile)};
-  lanSubnets=[...new Set([...lanSubnets,...Object.values(routes.bridges || {}).filter(bridge=>net.isIP(bridge.address)).map(bridge=>`${bridge.address}/${net.isIP(bridge.address)===6?128:32}`)])];
+  lanSubnets=[...new Set([...lanSubnets,...Object.values(routes.bridges || {}).flatMap(bridge=>bridge.addresses || [bridge.address]).filter(address=>net.isIP(address)).map(address=>`${address}/${net.isIP(address)===6?128:32}`)])];
   // Disabled wrapping chains reject traffic and must not override the saved DNS mode.
   const torConfigured=routes.profiles.some(profile=>profile.engine==='tor' && gatewayChainAvailable(routes.profiles,profile.id));
   const lanternConfigured=routes.profiles.some(profile=>profile.engine==='lantern' && gatewayChainAvailable(routes.profiles,profile.id));

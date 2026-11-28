@@ -1,3 +1,4 @@
+import {runJsonWorker,gatewayCurlConfig} from './json-worker.js';
 import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -9,26 +10,16 @@ export const speedLimits=Object.freeze({budgetMs:45000,requestMs:12000,downloadB
 export const speedSamples=Object.freeze([...Array.from({length:3},(_,index)=>Object.freeze({id:'latency-'+index,kind:'latency',bytes:0})),Object.freeze({id:'download',kind:'download',bytes:speedLimits.downloadBytes}),Object.freeze({id:'upload',kind:'upload',bytes:speedLimits.uploadBytes})]);
 const sampleUrl=sample=>'https://speed.cloudflare.com/'+(sample.kind==='upload'?'__up':'__down?bytes='+sample.bytes);
 export function requestSpeedSample(endpoint,sample,{signal,localPort,timeoutMs=speedLimits.requestMs,spawnProcess=spawn}={}){
- return new Promise((resolve,reject)=>{
-  if(!speedSamples.some(row=>row.id===sample?.id && row.kind===sample.kind && row.bytes===sample.bytes) || !Number.isInteger(localPort) || localPort<1024 || localPort>65535)return reject(Error('Invalid speedtest request.'));
-  if(signal?.aborted)return reject(Object.assign(Error('Diagnostic cancelled.'),{code:'ABORTED'}));
-  const budget=Math.max(1,Math.min(speedLimits.requestMs,timeoutMs));
-  let folder,uploadFile,child;const cleanup=()=>{if(folder){rmSync(folder,{recursive:true,force:true});folder=null;}};
-  try{if(sample.kind==='upload'){folder=mkdtempSync(join(tmpdir(),'fg-speed-upload-'));uploadFile=join(folder,'payload');writeFileSync(uploadFile,randomBytes(sample.bytes),{mode:0o600});}
-  child=spawnProcess('curl',['--disable','--config','-','--silent','--noproxy','','--proto','=https','--local-port',String(localPort),'--connect-timeout',String(Math.min(4,budget/1000)),'--max-time',String(budget/1000),'--max-filesize',String(sample.kind==='download'?sample.bytes:65536),'--header','Accept-Encoding: identity',...(sample.kind==='upload'?['--request','POST','--data-binary','@'+uploadFile,'--header','Content-Type: application/octet-stream','--header','Expect:']:[]),'--output','/dev/null','--write-out','%{json}'],{stdio:['pipe','pipe','pipe']});}catch{cleanup();reject(Error('Speedtest transport is unavailable.'));return;}
-  let settled=false,size=0,chunks=[];
-  const finish=(error,result)=>{if(settled)return;settled=true;clearTimeout(timer);cleanup();signal?.removeEventListener('abort',abort);error?reject(error):resolve(result);};
-  const abort=()=>{child.kill('SIGKILL');finish(Object.assign(Error('Diagnostic cancelled.'),{code:'ABORTED'}));};
-  const timer=setTimeout(()=>{child.kill('SIGKILL');finish(null,{exitCode:28});},budget+500);
-  signal?.addEventListener('abort',abort,{once:true});
-  child.stdout.on('data',chunk=>{size+=chunk.length;if(size>65536){child.kill('SIGKILL');finish(Error('Invalid speedtest response.'));}else chunks.push(chunk);});child.stderr.resume();
-  child.on('error',()=>finish(Error('Speedtest transport is unavailable.')));
-  child.on('close',code=>{if(settled)return;try{finish(null,{...JSON.parse(Buffer.concat(chunks).toString()),exitCode:code});}catch{finish(Error('Invalid speedtest response.'));}});
-  child.stdin.on('error',()=>{});
-  if(signal?.aborted){abort();return;}
-  // Only generated random bytes use a private temporary payload; credentials stay on stdin.
-  child.stdin.end(`proxy = "http://127.0.0.1:${endpoint.port}"\nproxy-user = ${JSON.stringify('fg-geo:'+endpoint.secret)}\nurl = ${JSON.stringify(sampleUrl(sample))}\n`);
- });
+ return (async()=>{
+  if(!speedSamples.some(row=>row.id===sample?.id && row.kind===sample.kind && row.bytes===sample.bytes) || !Number.isInteger(localPort) || localPort<1024 || localPort>65535)throw Error('Invalid speedtest request.');
+  if(signal?.aborted)throw Object.assign(Error('Diagnostic cancelled.'),{code:'ABORTED'});
+  const budget=Math.max(1,Math.min(speedLimits.requestMs,timeoutMs));let folder,uploadFile;
+  try{
+   if(sample.kind==='upload'){folder=mkdtempSync(join(tmpdir(),'fg-speed-upload-'));uploadFile=join(folder,'payload');writeFileSync(uploadFile,randomBytes(sample.bytes),{mode:0o600});}
+   const {value,exitCode}=await runJsonWorker('curl',['--disable','--config','-','--silent','--noproxy','','--proto','=https','--local-port',String(localPort),'--connect-timeout',String(Math.min(4,budget/1000)),'--max-time',String(budget/1000),'--max-filesize',String(sample.kind==='download'?sample.bytes:65536),'--header','Accept-Encoding: identity',...(sample.kind==='upload'?['--request','POST','--data-binary','@'+uploadFile,'--header','Content-Type: application/octet-stream','--header','Expect:']:[]),'--output','/dev/null','--write-out','%{json}'],{input:gatewayCurlConfig(endpoint,sampleUrl(sample)),signal,spawnProcess,timeoutMs:budget+500});return {...value,exitCode};
+  }catch(error){if(error.code==='ABORTED')throw error;if(error.code==='TIMEOUT')return {exitCode:28};throw Error(error.code==='INVALID_RESPONSE'?'Invalid speedtest response.':'Speedtest transport is unavailable.');}
+  finally{if(folder)rmSync(folder,{recursive:true,force:true});}
+ })();
 }
 const verified=row=>row?.pathObservation?.state==='verified';
 export function speedSampleResult(raw,sample){

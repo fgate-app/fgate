@@ -1,3 +1,5 @@
+import {wrapXhttpStream,xhttpDownloadStream} from '../shared/xray-xhttp.js';
+import {stopManagedProcess} from './managed-process.js';
 import {moduleBinary} from './module-paths.js';
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
@@ -24,21 +26,24 @@ export class XraySupervisor {
     let entry=this.entries.get(row.profile_id);
     if(!entry || entry.hash!==hash || !entry.process){
      if(!existsSync(this.binary))throw new Error("Xray-core is not installed.");
-     const outbound=config.outbounds[0],peer=outbound.settings.vnext[0],hostname=peer.address;
-     let address=hostname;
-     if(!net.isIP(address) && !row.wrapEndpoint?.remoteDns){
-      let timer;
+     const outbound=config.outbounds[0],peer=outbound.settings.vnext[0],download=xhttpDownloadStream(outbound.streamSettings);
+     const peers=[{peer,stream:outbound.streamSettings},...(download?[{peer:download,stream:download}]:[])];
+     for(const item of peers){
+      const hostname=item.peer.address;
+      if(net.isIP(hostname) || row.wrapEndpoint?.remoteDns)continue;
+      let timer,address;
       try{const result=await Promise.race([this.resolve(hostname,{all:true}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("Bootstrap DNS is unavailable.")),5000);})]);address=(result.find(item=>item.family===4) || result[0])?.address;}
       finally{clearTimeout(timer);}
       if(!net.isIP(address))throw new Error("Failed to resolve the VPN server address.");
-      if(outbound.streamSettings.security==='tls')outbound.streamSettings.tlsSettings={...outbound.streamSettings.tlsSettings,serverName:outbound.streamSettings.tlsSettings?.serverName || hostname};
-      peer.address=address;
+      if(item.stream.security==='tls')item.stream.tlsSettings={...item.stream.tlsSettings,serverName:item.stream.tlsSettings?.serverName || hostname};
+      item.peer.address=address;
      }
+     const address=peer.address,addresses=peers.map(item=>item.peer.address);
      const port=await unusedPort(),folder=join(this.dir,row.profile_id+'-'+hash.slice(0,12)+'-'+port);
      mkdirSync(folder,{recursive:true,mode:0o700});
-     entry={id:row.profile_id,hash,port,folder,path:join(folder,'config.json'),address,process:null,timer:null,stopping:false,retries:0};
+     entry={id:row.profile_id,hash,port,folder,path:join(folder,'config.json'),address,addresses,process:null,timer:null,stopping:false,retries:0};
      created.push(entry);
-     if(row.wrapEndpoint)outbound.streamSettings.sockopt={dialerProxy:'gateway-wrapper'};
+     if(row.wrapEndpoint)wrapXhttpStream(outbound.streamSettings,'gateway-wrapper');
      const managed={log:{loglevel:this.diagnosticLog?'info':'error'},inbounds:[{tag:'local',listen:'127.0.0.1',port,protocol:'socks',settings:{auth:'noauth',udp:true}}],outbounds:[{...outbound,tag:'vpn'},...(row.wrapEndpoint?[{tag:'gateway-wrapper',protocol:'socks',settings:{servers:[{address:'127.0.0.1',port:row.wrapEndpoint.port,users:[{user:row.wrapEndpoint.username,pass:row.wrapEndpoint.password}]}]}}]:[])],routing:{rules:[{type:'field',inboundTag:['local'],outboundTag:'vpn'}]}};
      writeFileSync(entry.path,JSON.stringify(managed),{mode:0o600});
      await this.validate(entry.path);this.start(entry);await this.ready(entry);
@@ -48,7 +53,7 @@ export class XraySupervisor {
   }catch(error){await Promise.all(created.map(entry=>this.stopEntry(entry)));throw error;}
   let settled=false;
   return {
-   bridges:Object.fromEntries([...next].map(([id,entry])=>[id,{port:entry.port,address:entry.address}])),
+   bridges:Object.fromEntries([...next].map(([id,entry])=>[id,{port:entry.port,address:entry.address,addresses:entry.addresses}])),
    commit:async()=>{if(settled)return;settled=true;const previous=this.entries;this.entries=next;await Promise.all([...previous.values()].filter(entry=>next.get(entry.id)!==entry).map(entry=>this.stopEntry(entry)));},
    rollback:async()=>{if(settled)return;settled=true;await Promise.all(created.map(entry=>this.stopEntry(entry)));},
   };
@@ -88,7 +93,7 @@ export class XraySupervisor {
  async ready(entry){for(let n=0;n<80;n++){if(!entry.process || entry.process.exitCode!==null)break;if(await listening(entry.port))return;await wait(100);}throw new Error("Xray did not open its local connection port.");}
  async stopEntry(entry){
   entry.stopping=true;clearTimeout(entry.timer);const child=entry.process;entry.process=null;
-  if(child?.pid && child.exitCode===null && child.signalCode===null){await new Promise(resolve=>{const timer=setTimeout(()=>{child.kill('SIGKILL');resolve();},2000);child.once('exit',()=>{clearTimeout(timer);resolve();});child.once('error',()=>{clearTimeout(timer);resolve();});child.kill('SIGTERM');});}
+  await stopManagedProcess(child,{timeout:2000});
   rmSync(entry.folder,{recursive:true,force:true});
  }
  async stop(){const entries=[...this.entries.values()];this.entries.clear();await Promise.all(entries.map(entry=>this.stopEntry(entry)));}

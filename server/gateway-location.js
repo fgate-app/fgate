@@ -1,3 +1,4 @@
+import {runJsonWorker,gatewayCurlConfig} from './json-worker.js';
 import {spawn} from 'node:child_process';
 import {createHash,createHmac} from 'node:crypto';
 import {isIP} from 'node:net';
@@ -25,23 +26,12 @@ export function locationListeners(profiles,configs,supportedTags,secret,{basePor
 // Credentials go to curl over stdin, never command-line arguments. The proxy
 // and empty NO_PROXY override guarantee that every lookup uses this outbound.
 export function requestLocationJson(endpoint,url,{signal,spawnProcess=spawn}={}) {
- return new Promise((resolve,reject)=>{
-  if(!/^https:\/\/(ipwho\.is|api\.ipapi\.is)\/$/.test(url))return reject(Error('Unsupported location service'));
+ return (async()=>{
+  if(!/^https:\/\/(ipwho\.is|api\.ipapi\.is)\/$/.test(url))throw Error('Unsupported location service');
   const timeoutMs=Math.max(1000,Math.min(60000,endpoint.timeoutMs || 8000));
-  const child=spawnProcess('curl',['--config','-','--fail','--silent','--show-error','--noproxy','','--proto','=https','--connect-timeout',String(Math.min(10,timeoutMs/1000)),'--max-time',String(timeoutMs/1000),'--max-filesize','65536'],{stdio:['pipe','pipe','pipe']});
-  let size=0,chunks=[],finished=false;
-  const finish=(error,value)=>{if(finished)return;finished=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);error?reject(error):resolve(value);};
-  const abort=()=>{child.kill('SIGKILL');finish(Error('Location request cancelled'));};
-  const timer=setTimeout(abort,timeoutMs+2000);
-  signal?.addEventListener('abort',abort,{once:true});
-  if(signal?.aborted){abort();return;}
-  child.on('error',()=>finish(Error('Location transport unavailable')));
-  child.stdout.on('data',chunk=>{size+=chunk.length;if(size>65536){abort();return;}chunks.push(chunk);});
-  child.stderr.resume();
-  child.on('close',code=>{if(code!==0)return finish(Error('Location lookup failed'));try{finish(null,JSON.parse(Buffer.concat(chunks).toString('utf8')));}catch{finish(Error('Invalid location response'));}});
-  child.stdin.on('error',()=>{});
-  child.stdin.end(`proxy = "http://127.0.0.1:${endpoint.port}"\nproxy-user = ${JSON.stringify('fg-geo:'+endpoint.secret)}\nurl = ${JSON.stringify(url)}\n`);
- });
+  try{const {value,exitCode}=await runJsonWorker('curl',['--disable','--config','-','--fail','--silent','--show-error','--noproxy','','--proto','=https','--connect-timeout',String(Math.min(10,timeoutMs/1000)),'--max-time',String(timeoutMs/1000),'--max-filesize','65536'],{input:gatewayCurlConfig(endpoint,url),signal,spawnProcess,timeoutMs:timeoutMs+2000});if(exitCode!==0)throw Object.assign(Error(),{code:'LOOKUP_FAILED'});return value;}
+  catch(error){throw Error(error.code==='ABORTED' || error.code==='TIMEOUT' || error.limitExceeded?'Location request cancelled':error.code==='INVALID_RESPONSE'?'Invalid location response':error.code==='LOOKUP_FAILED'?'Location lookup failed':'Location transport unavailable');}
+ })();
 }
 const text=value=>typeof value==='string'?value.replace(/[\x00-\x1f\x7f]/g,'').trim().slice(0,160):null;
 export function normalizeGatewayLocation(raw,source) {

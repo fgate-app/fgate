@@ -1,3 +1,4 @@
+import {stopManagedProcess} from '../managed-process.js';
 import {startCloudSsh,cloudSshAvailable} from './cloud-ssh.js';
 import {setTimeout as delay} from 'node:timers/promises';
 import {validDownloadGateways} from '../resource-fetch.js';
@@ -92,7 +93,7 @@ export class AccessPointRuntime{
  }
  async stop(id){
   const entry=this.entries.get(id);if(!entry)return;await this.sample(id).catch(()=>{});this.entries.delete(id);entry.stopped=true;
-  await Promise.all(entry.processes.map(child=>new Promise(resolve=>{if(child.exitCode!==null || child.signalCode!==null || !child.pid)return resolve();const timer=setTimeout(()=>{child.kill('SIGKILL');},2000);child.once('exit',()=>{clearTimeout(timer);resolve();});child.once('error',()=>{clearTimeout(timer);resolve();});child.kill('SIGTERM');})));
+  await Promise.all(entry.processes.map(child=>stopManagedProcess(child,{timeout:2000})));
   await entry.sshTransport?.close();rmSync(entry.folder,{recursive:true,force:true});
  }
  async close(){await Promise.all([...this.entries.keys()].map(id=>this.stop(id)));}

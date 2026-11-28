@@ -1,3 +1,4 @@
+import {runJsonWorker} from './json-worker.js';
 import dgram from 'node:dgram';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -14,21 +15,11 @@ export async function allocateSourcePort(network,options){
 
 // Credentials travel over stdin only; errors and stderr never enter the report.
 export function requestGatewayDns(request,{signal,spawnProcess=spawn,worker='dns'}={}){
-  return new Promise((resolve,reject)=>{
-    if(signal?.aborted)return reject(Object.assign(Error('Diagnostic cancelled.'),{code:'ABORTED'}));
-    if(!['dns','sni','tls','h3'].includes(worker))return reject(Error('Invalid diagnostic worker.'));
-    const child=spawnProcess('python3',[fileURLToPath(new URL(worker==='h3'?'./http3-probe.py':worker==='tls'?'./tls-versions.py':worker==='sni'?'./sni-probe.py':'./dns-matrix.py',import.meta.url)),worker==='sni'?'--gateway':'--gateway-attempt'],{stdio:['pipe','pipe','pipe']});
-    let settled=false,size=0,chunks=[];
-    const finish=(error,result)=>{if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);error?reject(error):resolve(result);};
-    const abort=()=>{child.kill('SIGKILL');finish(Object.assign(Error('Diagnostic cancelled.'),{code:'ABORTED'}));};
-    const timer=setTimeout(()=>{child.kill('SIGKILL');finish(Error('DNS gateway probe timed out.'));},8000);
-    signal?.addEventListener('abort',abort,{once:true});
-    child.on('error',()=>finish(Error('DNS gateway transport is unavailable.')));
-    child.stdout.on('data',chunk=>{size+=chunk.length;if(size>65536){child.kill('SIGKILL');finish(Error('Invalid DNS gateway response.'));}else chunks.push(chunk);});
-    child.stderr.resume();child.stdin.on('error',()=>{});
-    child.on('close',code=>{if(settled)return;try{if(code!==0)throw Error();finish(null,JSON.parse(Buffer.concat(chunks).toString()));}catch{finish(Error('Invalid DNS gateway response.'));}});
-    child.stdin.end(JSON.stringify(request));
-  });
+  return (async()=>{
+    if(!['dns','sni','tls','h3'].includes(worker))throw Error('Invalid diagnostic worker.');
+    try{const {value,exitCode}=await runJsonWorker('python3',[fileURLToPath(new URL(worker==='h3'?'./http3-probe.py':worker==='tls'?'./tls-versions.py':worker==='sni'?'./sni-probe.py':'./dns-matrix.py',import.meta.url)),worker==='sni'?'--gateway':'--gateway-attempt'],{input:JSON.stringify(request),signal,spawnProcess,timeoutMs:8000});if(exitCode!==0)throw Object.assign(Error(),{code:'INVALID_RESPONSE'});return value;}
+    catch(error){if(error.code==='ABORTED')throw error;throw Error(error.code==='TIMEOUT'?'DNS gateway probe timed out.':error.code==='INVALID_RESPONSE'?'Invalid DNS gateway response.':'DNS gateway transport is unavailable.');}
+  })();
 }
 const verified=row=>row.state==='ok' && !row.truncated && (row.routeVerified===true || row.pathObservation?.state==='verified');
 const signature=row=>JSON.stringify([row.rcode,(row.answers || []).map(answer=>[answer.name,answer.type,answer.value]).map(JSON.stringify).sort()]);

@@ -1,3 +1,4 @@
+import {stopManagedProcess} from '../managed-process.js';
 import net from 'node:net';
 import {spawn} from 'node:child_process';
 import {mkdtempSync,writeFileSync,rmSync,mkdirSync} from 'node:fs';
@@ -41,7 +42,7 @@ export async function startCloudSsh(server,{stateDir,signal,spawnProcess=spawn,t
  let relay,child,closed=false;const sockets=new Set();
  const close=async()=>{
   if(closed)return;closed=true;for(const s of sockets)s.destroy();
-  if(child && child.exitCode===null && child.signalCode===null){child.kill('SIGTERM');await new Promise(resolve=>{const timer=setTimeout(()=>{child.kill('SIGKILL');resolve();},1500);child.once('exit',()=>{clearTimeout(timer);resolve();});});}
+  await stopManagedProcess(child,{timeout:1500});
   await relay?.close();rmSync(folder,{recursive:true,force:true});
  };
  try{

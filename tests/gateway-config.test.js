@@ -25,7 +25,7 @@ test('native connections are emitted into mihomo and selected by routes',async()
 test('field editing preserves Xray options, native options and Outline prefix',async()=>{
  const {gatewayEditor}=await import('../server/gateway-editor.js');
  const store=new Store(':memory:');try{
-  const root={outbounds:[{protocol:'vless',settings:{vnext:[{address:'example.com',port:443,users:[{id:'fixture-id',encryption:'none',flow:'xtls-rprx-vision'}]}]},streamSettings:{network:'ws',security:'tls',tlsSettings:{serverName:'example.com',alpn:['h2'],allowInsecure:false},wsSettings:{path:'/vpn',headers:{Host:'edge.example.com',Custom:'keep'}}},mux:{enabled:true,concurrency:4}}]};
+  const root={outbounds:[{protocol:'vless',settings:{vnext:[{address:'example.com',port:443,users:[{id:'fixture-id',encryption:'none'}]}]},streamSettings:{network:'ws',security:'tls',tlsSettings:{serverName:'example.com',alpn:['h2'],allowInsecure:false},wsSettings:{path:'/vpn',headers:{Host:'edge.example.com',Custom:'keep'}}},mux:{enabled:true,concurrency:4}}]};
   const row=store.importProfile({name:'Advanced',value:JSON.stringify(root)}),snapshot=store.profileSnapshot(row.id),editor=gatewayEditor(snapshot);
   assert.equal(editor.fields.path,'/vpn');editor.fields.port='8443';
   store.updateProfile(row.id,{editor});

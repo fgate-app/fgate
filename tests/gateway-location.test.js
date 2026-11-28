@@ -27,7 +27,7 @@ test('GeoIP requests enforce authenticated loopback CONNECT, HTTPS, timeout and 
   child.stdin.on('data',value=>input+=value);child.stdin.on('finish',()=>{child.stdout.end('{"ip":"203.0.113.1"}');child.emit('close',0);});return child;
  }});
  assert.equal(result.ip,'203.0.113.1');assert.ok(input.includes('http://127.0.0.1:28001'));assert.ok(input.includes('fg-geo:private-secret'));
- assert.ok(!args.join(' ').includes('private-secret'));assert.equal(args[args.indexOf('--noproxy')+1],'');assert.equal(args[args.indexOf('--proto')+1],'=https');
+ assert.equal(args[0],'--disable');assert.ok(!args.join(' ').includes('private-secret'));assert.equal(args[args.indexOf('--noproxy')+1],'');assert.equal(args[args.indexOf('--proto')+1],'=https');
  await assert.rejects(requestLocationJson({port:1},'http://example.com/'));
 });
 test('listener pinning excludes disabled/unsupported profiles and distinguishes reassigned ports',()=>{

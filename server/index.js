@@ -129,6 +129,15 @@ export function createServer(store, { supervisor = null, filter = null, interfac
   };
   const domainUpdates=new DomainListUpdates({current:()=>{const value=domainListsStatus();return value.loaded && !value.partial && value.repository==='MetaCubeX/meta-rules-dat'?value.ref:null;},fetchImpl:resourceDownload,details:()=>{const value=domainListsStatus();return {loaded:value.loaded,updatedAt:value.updatedAt,presetCount:value.presets.length};},update:ref=>refreshDomainLists({ref})});
   const diagnosticListUpdates=new DomainListUpdates({id:diagnosticBlocklistSource.id,repository:diagnosticBlocklistSource.repository,current:()=>diagnosticBlocklist.status().ref,details:()=>diagnosticBlocklist.status(),update:ref=>diagnosticBlocklist.update(ref),fetchImpl:diagnosticListFetch || resourceDownload});
+  const updateChecksAvailable=()=>!maintenanceBusy && !diagnosticRunning && !domainUpdates.task && !diagnosticListUpdates.task && !domainRefresh;
+  const checkUpdates=async()=>{
+    const result=await modulesHelper('check',undefined,undefined,downloadGateways(store,supervisor));
+    if(!result.ok)return result;
+    if(!domainUpdates.task)domainUpdates.start('check');
+    if(!diagnosticListUpdates.task)diagnosticListUpdates.start('check');
+    return result;
+  };
+
   const server=http.createServer(async (req,res) => {
     let actor=null, eventDetail,eventMetadata,countedWrite=false;
     const send = (status,data) => {
@@ -298,13 +307,12 @@ export function createServer(store, { supervisor = null, filter = null, interfac
         if(req.method==='POST' && body.id!=='system' && isReleaseManagedModule(body.id))return send(400,{error:'This module is updated with the application.'});
         if(req.method==='POST' && body.id==='diagnostic-blocklist'){try{return send(202,diagnosticListUpdates.start(body.op,body.version));}catch(error){return send(error.status || 400,{error:error.message});}}
         if(req.method==='POST' && body.id==='domain-lists'){try{return send(202,domainUpdates.start(body.op,body.version));}catch(error){return send(error.status || 400,{error:error.message});}}
-        const result=await modulesHelper(req.method==='GET'?'status':body.op,body.id,body.version,req.method==='POST'?downloadGateways(store,supervisor):[]);
+        const result=req.method==='POST' && body.op==='check' && !body.id?await checkUpdates():await modulesHelper(req.method==='GET'?'status':body.op,body.id,body.version,req.method==='POST'?downloadGateways(store,supervisor):[]);
         if(!result.ok)return send(result.status || 502,{error:result.error});
         if(req.method==='GET'){
           for(const module of result.modules)if(module.id==='frp')module.runtimeState=await accessPoints.moduleState?.() || 'unknown';
           result.modules.push(domainUpdates.snapshot(),diagnosticListUpdates.snapshot());
         }
-        else if(body.op==='check' && !body.id){if(!domainUpdates.task)domainUpdates.start('check');if(!diagnosticListUpdates.task)diagnosticListUpdates.start('check');}
         return send(req.method==='POST'?202:200,result);
       }
       if(key==='GET /api/system') return send(200,{...await collectMetrics(),modules,moduleVersions:installedModuleVersions(moduleVersions)});
@@ -579,6 +587,7 @@ export function createServer(store, { supervisor = null, filter = null, interfac
         const id=url.pathname.split('/').pop(),previous=store.profileSnapshot(id);
         if(gatewaySubscriptions.isBusy(id))return send(409,{error:'This subscription is already updating.'});
         if(!previous)return send(404,{error:"Connection not found."});
+        if(gatewaySubscriptions.membership().has(id) && ['value','editor','username','password','fields','settings'].some(key=>Object.hasOwn(body,key)))return send(409,{error:'Connection parameters are managed by the subscription.'});
         if(previous.profile.engine==='lantern' && body.enabled===true){try{verifyLantern(lanternBinary());}catch(error){return send(400,{error:error.message});}}
         if(Object.keys(body).length===1 && Object.hasOwn(body,'enabled')){
           try{if(body.enabled!==false)await assertNoResolvedAccessPointGateway(store.previewGatewayChange(body,id),()=>accessPoints.repository.all());const updated=await inlineChanges.change(()=>store.updateProfile(id,body));return send(200,{...updated,apply:inlineChanges.status()});}
@@ -709,6 +718,12 @@ export function createServer(store, { supervisor = null, filter = null, interfac
       send(400,{error: error.message?.startsWith("Specify") || error.message==="Unknown network topology." ? error.message:"The request could not be completed."});
     } finally {if(countedWrite)activeWrites--;}
   });
+  server.checkUpdates=async()=>{
+    if(!updateChecksAvailable())return false;
+    const result=await checkUpdates();
+    if(!result.ok){if(result.status===409)return false;throw Error('Automatic update check is unavailable.');}
+    return true;
+  };
   server.accessPoints=accessPoints;
   server.once('close',()=>{clearInterval(journalTimer);clearInterval(blockedTimer);clearInterval(subscriptionTimer);gatewaySubscriptions.close();blockedJournal.stop();});
   server.once('close',()=>inlineChanges.close());

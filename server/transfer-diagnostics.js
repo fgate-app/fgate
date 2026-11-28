@@ -1,3 +1,4 @@
+import {runJsonWorker,gatewayCurlConfig} from './json-worker.js';
 import {followDiagnosticRedirects,validRedirectUrl} from './diagnostic-redirects.js';
 import {validDiagnosticUrl,diagnosticTargetLimits} from '../shared/diagnostic-targets.js';
 import {spawn} from 'node:child_process';
@@ -9,32 +10,15 @@ import {allocateDiagnosticTcpPort} from './diagnostic-port.js';
 // Website samples follow bounded redirects with evidence from every hop.
 export const transferTargets=Object.freeze([65536,1048576].map(bytes=>Object.freeze({bytes,url:`https://speed.cloudflare.com/__down?bytes=${bytes}`})));
 export function requestTransfer(endpoint,target,{signal,localPort,timeoutMs=12000,spawnProcess=spawn,redirectHop=false}={}){
-  return new Promise((resolve,reject)=>{
-    if(!transferTargets.some(row=>row.url===target?.url && row.bytes===target?.bytes) && !(target?.mode==='site-response' && target.bytes===diagnosticTargetLimits.maxSampleBytes && (validDiagnosticUrl(target.url) || (redirectHop && validRedirectUrl(target.url)))))return reject(Error('Invalid transfer target.'));
-    if(signal?.aborted)return reject(Object.assign(Error('Diagnostic cancelled.'),{code:'ABORTED'}));
-    if(!Number.isInteger(localPort) || localPort<1024 || localPort>65535)return reject(Error('Invalid local port.'));
-    const budget=Math.max(1,Math.min(12000,timeoutMs));
-    const child=spawnProcess('curl',['--disable','--config','-','--silent','--noproxy','','--proto','=https','--local-port',String(localPort),
+  return (async()=>{
+    if(!transferTargets.some(row=>row.url===target?.url && row.bytes===target?.bytes) && !(target?.mode==='site-response' && target.bytes===diagnosticTargetLimits.maxSampleBytes && (validDiagnosticUrl(target.url) || (redirectHop && validRedirectUrl(target.url)))))throw Error('Invalid transfer target.');
+    if(!Number.isInteger(localPort) || localPort<1024 || localPort>65535)throw Error('Invalid local port.');
+    const budget=Math.max(1,Math.min(12000,timeoutMs));let receivedBytes=0,oversized=false;
+    try{const {value,exitCode}=await runJsonWorker('curl',['--disable','--config','-','--silent','--noproxy','','--proto','=https','--local-port',String(localPort),
       '--connect-timeout',String(Math.min(4,budget/1000)),'--max-time',String(budget/1000),
-      ...(target.mode==='site-response'?['--range',`0-${target.bytes-1}`]:[]),'--max-filesize',String(target.bytes),'--header','Accept-Encoding: identity','--output','-','--write-out','%{stderr}%{json}'],{stdio:['pipe','pipe','pipe']});
-    let settled=false,receivedBytes=0,size=0,chunks=[],oversized=false;
-    const finish=(error,result)=>{if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);error?reject(error):resolve(result);};
-    const abort=()=>{child.kill('SIGKILL');finish(Object.assign(Error('Diagnostic cancelled.'),{code:'ABORTED'}));};
-    const timer=setTimeout(()=>{child.kill('SIGKILL');finish(null,{exitCode:28,receivedBytes,observation:'timeout'});},budget+500);
-    signal?.addEventListener('abort',abort,{once:true});
-    // Discard every body chunk immediately. Memory never grows with the response.
-    child.stdout.on('data',chunk=>{receivedBytes+=chunk.length;if(receivedBytes>target.bytes){oversized=true;child.kill('SIGKILL');}});
-    child.stderr.on('data',chunk=>{size+=chunk.length;if(size>65536){child.kill('SIGKILL');finish(Error('Invalid transfer response.'));}else chunks.push(chunk);});
-    child.on('error',()=>finish(Error('Transfer transport is unavailable.')));
-    child.on('close',code=>{
-      if(settled)return;
-      try{const raw=JSON.parse(Buffer.concat(chunks).toString());finish(null,{...raw,exitCode:code,receivedBytes,oversized});}
-      catch{if(oversized)finish(null,{exitCode:63,receivedBytes,oversized:true});else finish(Error('Invalid transfer response.'));}
-    });
-    child.stdin.on('error',()=>{});
-    if(signal?.aborted){abort();return;}
-    child.stdin.end(`proxy = "http://127.0.0.1:${endpoint.port}"\nproxy-user = ${JSON.stringify('fg-geo:'+endpoint.secret)}\nurl = ${JSON.stringify(target.url)}\n`);
-  });
+      ...(target.mode==='site-response'?['--range',`0-${target.bytes-1}`]:[]),'--max-filesize',String(target.bytes),'--header','Accept-Encoding: identity','--output','-','--write-out','%{stderr}%{json}'],{input:gatewayCurlConfig(endpoint,target.url),signal,spawnProcess,timeoutMs:budget+500,jsonStream:'stderr',onBody:chunk=>{receivedBytes+=chunk.length;if(receivedBytes>target.bytes){oversized=true;return false;}}});return {...value,exitCode,receivedBytes,oversized};}
+    catch(error){if(error.code==='ABORTED')throw error;if(error.code==='TIMEOUT')return {exitCode:28,receivedBytes,observation:'timeout'};if(error.code==='INVALID_RESPONSE' && !error.limitExceeded && oversized)return {exitCode:63,receivedBytes,oversized:true};throw Error(error.code==='INVALID_RESPONSE'?'Invalid transfer response.':'Transfer transport is unavailable.');}
+  })();
 }
 const ms=value=>Number.isFinite(value) && value>=0?Math.round(value*1000):null;
 export function transferAttempt(raw,target){

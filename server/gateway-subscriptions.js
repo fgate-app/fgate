@@ -23,7 +23,21 @@ export class GatewaySubscriptions{
  configure(id,input){return this.run(()=>this.performConfigure(id,input));}
  list(){return this.repository.list();}
  membership(){return new Map(this.repository.all().flatMap(row=>row.members.map(m=>[m.profileId,{subscriptionId:row.id,subscriptionName:row.name,subscriptionMissing:!!m.missing}])));}
- cachedRecords(row){return Array.isArray(row.secrets.records)?row.secrets.records:row.members.flatMap(member=>{const snapshot=this.store.profileSnapshot(member.profileId);return snapshot?.config?[{key:member.key,label:member.providerName || snapshot.profile.name,type:gatewayEditor(snapshot).type,snapshot}]:[];});}
+ reconcileRecords(source,records){
+  // Addresses, ports and transport paths are mutable provider settings. Reuse
+  // the selected profile only when provider label + editor type is unique on
+  // both sides; exact keys always win and ambiguous labels remain missing.
+  const identity=(label,type)=>JSON.stringify([label,type]);
+  const old=source.members.flatMap(member=>{const snapshot=this.store.profileSnapshot(member.profileId);if(!snapshot?.config)return [];try{return [{member,identity:identity(member.providerName || snapshot.profile.name,gatewayEditor(snapshot).type)}];}catch{return [];}});
+  const incoming=records.map(record=>({record,identity:identity(record.label,record.type)}));
+  const counts=list=>{const map=new Map();for(const item of list)map.set(item.identity,(map.get(item.identity) || 0)+1);return map;};
+  const oldCounts=counts(old),newCounts=counts(incoming),present=new Set(records.map(record=>record.key));
+  const candidates=new Map(old.filter(item=>!present.has(item.member.key) && oldCounts.get(item.identity)===1 && newCounts.get(item.identity)===1).map(item=>[item.identity,item.member.key]));
+  const memberKeys=new Set(source.members.map(member=>member.key));
+  return incoming.map(({record,identity})=>memberKeys.has(record.key) || !candidates.has(identity)?record:{...record,key:candidates.get(identity)});
+ }
+ cachedRecords(row){const records=Array.isArray(row.secrets.records)?row.secrets.records:row.members.flatMap(member=>{const snapshot=this.store.profileSnapshot(member.profileId);return snapshot?.config?[{key:member.key,label:member.providerName || snapshot.profile.name,type:gatewayEditor(snapshot).type,snapshot}]:[];});return this.reconcileRecords(row,records);}
+
  usage(profileId){
   const allGroups=this.store.connectionGroups(),groups=allGroups.filter(group=>connectionGroupContains(allGroups,group.id,profileId));const targets=new Set([profileId,...groups.map(group=>group.id)]);
   return {routes:[...this.store.routeGroups(),...this.store.deviceRoutes()].filter(route=>targets.has(route.routeId)).map(route=>route.name),groups:groups.map(group=>group.name),gateways:this.store.profiles().filter(profile=>profile.gatewayId===profileId).map(profile=>profile.name)};
@@ -49,7 +63,7 @@ export class GatewaySubscriptions{
  async performPreview(input,{signal}={}){
   if(this.closed)fail('Subscriptions are shutting down.',503);const config=settings(input),url=resourceUrl(input.url);
   const rows=await this.download(url,signal);for(const [id,p] of this.previews)if(p.expires<Date.now())this.previews.delete(id);if(this.previews.size>=20)fail('Wait for a subscription preview to expire.',409);
-  const token=randomUUID();this.previews.set(token,{...config,url,rows,expires:Date.now()+300000});const old=input.id?this.repository.get(input.id):null;
+  const token=randomUUID();this.previews.set(token,{...config,url,rows,expires:Date.now()+300000});const old=input.id?this.repository.get(input.id):null;if(old){const reconciled=this.reconcileRecords(old,rows);rows.splice(0,rows.length,...reconciled);}
   return {token,records:old?this.nodeDetails(old,rows):rows.map(({key,label,type})=>({key,label,type})),selected:old?old.members.filter(m=>rows.some(r=>r.key===m.key)).map(m=>m.key):rows.map(row=>row.key)};
  }
  async performSave(id,input){
@@ -75,7 +89,7 @@ export class GatewaySubscriptions{
  }
  async performRefresh(id,{profileId,signal}={}){
   if(this.busy.has(id))fail('This subscription is already updating.',409);this.busy.add(id);
-  try{const row=this.repository.get(id);if(profileId && !row.members.some(m=>m.profileId===profileId))fail('This gateway does not belong to the subscription.');const rows=await this.download(row.secrets.url,signal);return await this.sync(row,rows,{profileId,locked:true});}
+  try{const row=this.repository.get(id);if(profileId && !row.members.some(m=>m.profileId===profileId))fail('This gateway does not belong to the subscription.');const rows=this.reconcileRecords(row,await this.download(row.secrets.url,signal));return await this.sync(row,rows,{profileId,locked:true});}
   catch(error){const row=this.repository.get(id);row.error='Could not update the subscription. Previous configurations were preserved.';row.nextAt=new Date(Date.now()+15*60000).toISOString();this.repository.save(row);throw error;}
   finally{this.busy.delete(id);}
  }
@@ -83,6 +97,7 @@ export class GatewaySubscriptions{
   if(!locked){if(this.busy.has(row.id))fail('This subscription is already updating.',409);this.busy.add(row.id);}
   try{return await this.serialize(async()=>{
    if(this.closed)fail('Subscriptions are shutting down.',503);
+   rows=this.reconcileRecords(row,rows);
    const previous=this.repository.all().find(p=>p.id===row.id),members=row.members.filter(m=>selected.includes(m.key)),detached=row.members.filter(m=>!selected.includes(m.key));
    if(states){const required=members.flatMap(member=>{const profile=this.store.profileSnapshot(member.profileId)?.profile;if(profile?.enabled && states.get(member.key)===false){const usage=this.usage(profile.id);if(Object.values(usage).some(list=>list.length) && !(Array.isArray(confirmDisable) && confirmDisable.includes(profile.id)))return [{profileId:profile.id,key:member.key,name:profile.name,usage}];}return [];});if(required.length)throw Object.assign(new PublicError('Confirm disabling gateways that are in use.'),{status:409,code:'gateway-disable-confirmation-required',inUse:required});}
    const targets=rows.filter(r=>selected.includes(r.key) && (!profileId || members.some(m=>m.profileId===profileId && m.key===r.key)));

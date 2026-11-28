@@ -1,3 +1,4 @@
+import {runJsonWorker,gatewayCurlConfig} from './json-worker.js';
 import {probeGatewayTcp} from './gateway-tunnel.js';
 import {safeProxyFlow} from '../shared/proxy-flow-evidence.js';
 import {mkdtemp,rm} from 'node:fs/promises';
@@ -18,22 +19,12 @@ const fingerprint=snapshot=>createHash('sha256').update(JSON.stringify(snapshot)
 const abort=()=>Object.assign(Error('Diagnostic cancelled.'),{code:'ABORTED'});
 
 export function strategyRequest(port,url,{signal,spawnProcess=spawn}={}){
- return new Promise((resolve,reject)=>{
-  if(signal?.aborted)return reject(abort());
-  const child=spawnProcess('curl',['--disable','--config','-','--silent','--noproxy','','--proto','=https','--connect-timeout','4','--max-time','8','--max-filesize','1048576','--output','/dev/null','--write-out','%{json}'],{stdio:['pipe','pipe','ignore']});
-  let raw='',done=false;
-  const finish=(error,result)=>{if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',cancel);error?reject(error):resolve(result);};
-  const cancel=()=>{child.kill('SIGKILL');finish(abort());};
-  const timer=setTimeout(()=>{child.kill('SIGKILL');finish(null,{state:'unavailable',reason:'timeout'});},10000);
-  signal?.addEventListener('abort',cancel,{once:true});
-  child.stdout.on('data',chunk=>{raw+=chunk;if(raw.length>65536){child.kill('SIGKILL');finish(null,{state:'unavailable',reason:'invalid-response'});}});
-  child.on('error',()=>finish(null,{state:'unavailable',reason:'transport-unavailable'}));
-  child.on('close',code=>{try{
-   const value=JSON.parse(raw),status=Number(value.response_code ?? value.http_code),ok=code===0 && status>=200 && status<400 && Number(value.ssl_verify_result)===0 && Number(value.time_appconnect)>0;
-   finish(null,{state:ok?'ok':'failed',reason:ok?null:code===28?'timeout':code===60?'certificate-error':code===35?'tls-error':'proxy-request-failed',httpStatus:Number.isInteger(status)?status:null,bytes:Math.min(Number(value.size_download) || 0,1048576)});
-  }catch{finish(null,{state:'unavailable',reason:'invalid-response'});}});
-  child.stdin.on('error',()=>{});child.stdin.end(`proxy = "socks5h://127.0.0.1:${port}"\nurl = ${JSON.stringify(url)}\n`);
- });
+ return (async()=>{
+  try{const {value,exitCode:code}=await runJsonWorker('curl',['--disable','--config','-','--silent','--noproxy','','--proto','=https','--connect-timeout','4','--max-time','8','--max-filesize','1048576','--output','/dev/null','--write-out','%{json}'],{input:gatewayCurlConfig({port,type:'socks5'},url),signal,spawnProcess,timeoutMs:10000});
+   const status=Number(value.response_code ?? value.http_code),ok=code===0 && status>=200 && status<400 && Number(value.ssl_verify_result)===0 && Number(value.time_appconnect)>0;
+   return {state:ok?'ok':'failed',reason:ok?null:code===28?'timeout':code===60?'certificate-error':code===35?'tls-error':'proxy-request-failed',httpStatus:Number.isInteger(status)?status:null,bytes:Math.min(Number(value.size_download) || 0,1048576)};
+  }catch(error){if(error.code==='ABORTED')throw error;return {state:'unavailable',reason:error.code==='TIMEOUT'?'timeout':error.code==='INVALID_RESPONSE'?'invalid-response':'transport-unavailable'};}
+ })();
 }
 
 export async function probeProxyStrategy({snapshot,address,strategy,domain,signal,helper=sendCommand,request=strategyRequest,makeClient,workDir,tcpProbe=probeGatewayTcp,gateRepeats=1}){

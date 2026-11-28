@@ -1,3 +1,5 @@
+import {xhttpDownloadStream} from '../shared/xray-xhttp.js';
+import {normalizeXrayProfile} from './xray-profile.js';
 import {isIP} from 'node:net';
 import {lookup} from 'node:dns/promises';
 import {gatewayEditor} from './gateway-editor.js';
@@ -23,6 +25,7 @@ export function gatewayHost(snapshot){
 // Native multi-peer gateways can connect without a top-level server field.
 export function gatewayHosts(snapshot){
  const hosts=[gatewayHost(snapshot)];
+ if(snapshot?.config?.engine==='xray'){const stream=normalizeXrayProfile(snapshot.config.config).outbounds[0].streamSettings;hosts.push(xhttpDownloadStream(stream)?.address);}
  if(snapshot?.config?.engine==='mihomo'){
   const saved=JSON.parse(snapshot.config.config),proxy=saved.mihomo || saved;
   if(proxy.type==='wireguard')hosts.push(...(proxy.peers || []).map(peer=>peer.server));

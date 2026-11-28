@@ -1,3 +1,5 @@
+import {DailyUpdateChecks} from './daily-update-checks.js';
+import {dirname,join} from 'node:path';
 import {restoreStartup,runtimeStartupStages} from './startup.js';
 import {Store} from './store.js';
 import {MihomoSupervisor} from './mihomo.js';
@@ -39,6 +41,8 @@ export function startRuntime(createServer) {
     }
   };
   const server=createServer(store,{supervisor,filter,zapretProbe,maintenanceRuntime});
+  const dailyUpdates=new DailyUpdateChecks({path:join(process.env.FREEDOMGATE_STATE_DIR || dirname(process.env.FREEDOMGATE_DB || '.data/freedomgate.sqlite'),'update-check-schedule.json'),check:()=>server.checkUpdates(),canRun:()=>server.runtimeReady===true});
+  server.once('close',()=>dailyUpdates.stop());
   const systemJournal=process.platform==='linux'?startSystemJournal(store):null;
   server.once('close',()=>systemJournal?.stop());
   const startupAbort=new AbortController();
@@ -54,7 +58,7 @@ export function startRuntime(createServer) {
   });
   let stopping=false;
   for(const signal of ['SIGINT','SIGTERM']) process.on(signal,()=>{
-    if(stopping)return;stopping=true;server.runtimeReady=false;startupAbort.abort();
+    if(stopping)return;stopping=true;dailyUpdates.stop();server.runtimeReady=false;startupAbort.abort();
     server.close(async()=>{
       await server.startup;
       const results=await Promise.allSettled([server.cleanup,filter.stop(),supervisor.stop()]);

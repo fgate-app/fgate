@@ -1,14 +1,17 @@
+import {xhttpFields,isXhttp,xhttpDraft,patchXhttp} from '../shared/xray-xhttp.js';
+import {xrayMuxFields,xrayMuxDraft,xrayMuxFromDraft} from '../shared/xray-mux.js';
+import {xraySecurityFields,xraySecuritySettings} from '../shared/xray-security.js';
 import {nativePrefix,mihomoDraft,mihomoFromDraft} from '../shared/mihomo-proxy.js';
 import {normalizeTorSettings} from '../shared/tor.js';
 import {normalizeHysteria2} from '../shared/hysteria2.js';
 import {normalizeSsProfile} from './ss-profile.js';
 import {normalizeXrayProfile} from './xray-profile.js';
 import {manualFields,manualConfig,visibleFields} from '../shared/manual-gateway.js';
-const xpaths={server:['settings','vnext',0,'address'],port:['settings','vnext',0,'port'],uuid:['settings','vnext',0,'users',0,'id'],flow:['settings','vnext',0,'users',0,'flow'],security:['streamSettings','security'],network:['streamSettings','network']};
+const xpaths={encryption:['settings','vnext',0,'users',0,'encryption'],server:['settings','vnext',0,'address'],port:['settings','vnext',0,'port'],uuid:['settings','vnext',0,'users',0,'id'],flow:['settings','vnext',0,'users',0,'flow'],security:['streamSettings','security'],network:['streamSettings','network']};
 function paths(out){
  const stream=out.streamSettings || {},security=stream.security==='reality'?'realitySettings':'tlsSettings';
  const transport=['xhttp','splithttp'].includes(stream.network)?'xhttpSettings':stream.network==='httpupgrade'?'httpupgradeSettings':'wsSettings';
- return {...xpaths,sni:['streamSettings',security,'serverName'],fingerprint:['streamSettings',security,'fingerprint'],publicKey:['streamSettings','realitySettings','publicKey'],shortId:['streamSettings','realitySettings','shortId'],path:['streamSettings',transport,'path'],host:['streamSettings',transport,...(transport==='wsSettings'?['headers','Host']:['host'])],serviceName:['streamSettings','grpcSettings','serviceName']};
+ return {...Object.fromEntries(xraySecurityFields.map(key=>[key,['streamSettings',['spiderX','mldsa65Verify'].includes(key)?'realitySettings':'tlsSettings',key]])),...xpaths,sni:['streamSettings',security,'serverName'],fingerprint:['streamSettings',security,'fingerprint'],publicKey:['streamSettings','realitySettings',stream.realitySettings?.password!==undefined?'password':'publicKey'],shortId:['streamSettings','realitySettings','shortId'],path:['streamSettings',transport,'path'],host:['streamSettings',transport,...(transport==='wsSettings'?['headers','Host']:['host'])],serviceName:['streamSettings','grpcSettings','serviceName']};
 }
 export function gatewayEditor(snapshot){
  const row=snapshot?.config;if(!row || snapshot.profile.builtin && !['tor','lantern'].includes(row.engine))throw new Error("The configuration is not available for editing.");
@@ -17,7 +20,8 @@ export function gatewayEditor(snapshot){
  let type,fields={};
  if(row.engine==='xray'){
   type='vless';const out=normalizeXrayProfile(row.config).outbounds[0];
-  for(const [f,path] of Object.entries(paths(out)))fields[f]=path.reduce((v,k)=>v?.[k],out) ?? '';
+  for(const [f,path] of Object.entries(paths(out))){const value=path.reduce((v,k)=>v?.[k],out);fields[f]=Array.isArray(value)?value.join(', '):(value ?? '');}
+  Object.assign(fields,xrayMuxDraft(out),xhttpDraft(out.streamSettings.xhttpSettings));
   fields.publicKey ||= out.streamSettings?.realitySettings?.password || '';
   fields.security ||= 'none';fields.network ||= 'tcp';
  }else if(row.engine==='outline' || row.config.startsWith('ss://')){
@@ -43,14 +47,19 @@ export function editGatewayConfig(snapshot,input){
  const changes=Object.keys(fields).filter(k=>fields[k]!==original.fields[k]);
  if(!changes.length)return snapshot.config.config;
  // Validate the form, then patch only represented fields in the saved config.
+ const xrayRoot=original.type==='vless'?normalizeXrayProfile(snapshot.config.config):null;
  const generated=manualConfig(original.type,fields);
  if(original.type==='vless'){
   const active=visibleFields('vless',fields);
-  const dependent=[...(changes.includes('security')?['sni','fingerprint','publicKey','shortId']:[]),...(changes.includes('network')?['path','host','serviceName']:[])];
+  const dependent=[...(changes.includes('security')?['sni','fingerprint','publicKey','shortId',...xraySecurityFields]:[]),...(changes.includes('network')?['path','host','serviceName']:[])];
   for(const f of dependent)if(active.includes(f) && !changes.includes(f))changes.push(f);
-  const root=normalizeXrayProfile(snapshot.config.config),out=root.outbounds[0];
+  const root=xrayRoot,out=root.outbounds[0];
   const location=paths({...out,streamSettings:{...out.streamSettings,security:fields.security,network:fields.network}});
-  for(const f of changes){const path=location[f];let target=out;for(const k of path.slice(0,-1))target=target[k] ||= {};target[path.at(-1)]=f==='port'?Number(fields[f]):fields[f];}
+  const advanced=xraySecuritySettings(fields);
+  for(const f of changes){if(xrayMuxFields.includes(f) || xhttpFields.includes(f))continue;if(xraySecurityFields.includes(f)){if(!active.includes(f))continue;const path=location[f],branch=out.streamSettings[path[1]] ||= {},value=advanced[path[1]]?.[f];if(value===undefined)delete branch[f];else branch[f]=value;continue;}const path=location[f];let target=out;for(const k of path.slice(0,-1))target=target[k] ||= {};target[path.at(-1)]=f==='port'?Number(fields[f]):fields[f];}
+  if(isXhttp(fields.network) && (changes.some(field=>xhttpFields.includes(field)) || changes.includes('network')))out.streamSettings.xhttpSettings=patchXhttp(out.streamSettings.xhttpSettings || {},fields,changes.includes('network')?xhttpFields:changes);
+  if(changes.some(field=>xrayMuxFields.includes(field))){const mux=xrayMuxFromDraft(fields);out.mux={...(out.mux || {}),...mux};}
+  if(changes.includes('publicKey') && out.streamSettings.realitySettings?.password!==undefined && out.streamSettings.realitySettings?.publicKey!==undefined)out.streamSettings.realitySettings.publicKey=fields.publicKey;
   return JSON.stringify(root);
  }
  if(['wireguard','openvpn'].includes(original.type)){

@@ -12,6 +12,7 @@ test('an exited managed child is not signalled by a stale escalation timer',asyn
  const child=new EventEmitter(),signals=[];child.kill=signal=>{signals.push(signal);child.emit('exit',0);};
  await stopManagedProcess(child,{timeout:10});await new Promise(resolve=>setTimeout(resolve,30));assert.deepEqual(signals,['SIGTERM']);
 });
+test('managed cleanup tolerates an unstarted process placeholder',async()=>{await stopManagedProcess({});await stopManagedProcess(null);});
 test('managed process termination escalates when a real child ignores SIGTERM',async()=>{
  const child=spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});console.log('ready');setInterval(()=>{},1000)"],{stdio:['ignore','pipe','ignore']});
  const exited=once(child,'exit');await once(child.stdout,'data');await stopManagedProcess(child,{timeout:30});
