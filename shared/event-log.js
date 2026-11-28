@@ -1,6 +1,12 @@
 // Only these static action templates may enter the audit log. Never log bodies,
 // query strings, arbitrary paths, profile links or exported client credentials.
 export const eventLabels = {
+  'POST /api/telegram/chats':'Detecting Telegram chats',
+  'PUT /api/telegram':'Saving Telegram settings',
+  'POST /api/telegram/test':'Sending a Telegram test notification',
+  'POST /api/configuration/backups':'Creating a configuration backup',
+  'SYSTEM telegram-delivered':'Telegram notification delivered',
+  'SYSTEM telegram-delivery-failed':'Telegram notification delivery failed',
   'SYSTEM gateway-http-failed':'Узел HTTP-проверки шлюза недоступен',
   'SYSTEM gateway-http-restored':'Доступ к узлу HTTP-проверки шлюза восстановлен',
   'SYSTEM restore-failed':'Не удалось восстановить работу службы',

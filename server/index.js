@@ -1,3 +1,5 @@
+import {TelegramNotifications} from './telegram.js';
+import {observeTelegramRuntime} from './telegram-events.js';
 import {inspectRestoreCloud,detachRestoreCloud} from './cloud-restore.js';
 import {ConfigurationBackups,generateBackupSecret,encryptConfiguration,decryptConfiguration} from './configuration-backup.js';
 import {GatewaySubscriptions} from './gateway-subscriptions.js';
@@ -71,7 +73,7 @@ moduleVersions.frp=JSON.parse(readFileSync(new URL('./access-points/assets.json'
 moduleVersions.outline = modulesLock.bundledModules?.find(module=>module.id==='outline')?.version || '—';
 moduleVersions.zapret = modulesLock.sourceModules?.find(module => module.id === 'zapret2')?.commit?.slice(0, 7) || '—';
 moduleVersions['domain-lists'] = modulesLock.sourceModules?.find(module => module.id === 'metacube-rules')?.commit?.slice(0, 7) || '—';
-export function createServer(store, { supervisor = null, filter = null, interfaces = listInterfaces, zapretProbe = null, zapretApply = applyZapret, networkApply = applyNetwork, domainListUpdate = updateDomainLists, accessPoints = null, gatewayDeployments = null, inlineDelay = 5000, modulesHelper = moduleCommand, networkTraffic = null, diagnosticUplink = probeUplink, diagnosticEndpoint = probeGatewayEndpoint, diagnosticEndpointDns = probeEndpointDns, diagnosticDns = probeDnsMatrix, diagnosticSni = probeSni, diagnosticStrategies = diagnoseProxyStrategies, diagnosticRoute = probeEndpointRoute, diagnosticMtu = probeMtu, diagnosticComparison = compareProxyPaths, diagnosticBlocklist = null, diagnosticListFetch = null,resourceFetch = null, maintenanceRuntime = null, cloudRestoreCheck = null } = {}) {
+export function createServer(store, { supervisor = null, filter = null, interfaces = listInterfaces, zapretProbe = null, zapretApply = applyZapret, networkApply = applyNetwork, domainListUpdate = updateDomainLists, accessPoints = null, gatewayDeployments = null, inlineDelay = 5000, modulesHelper = moduleCommand, networkTraffic = null, diagnosticUplink = probeUplink, diagnosticEndpoint = probeGatewayEndpoint, diagnosticEndpointDns = probeEndpointDns, diagnosticDns = probeDnsMatrix, diagnosticSni = probeSni, diagnosticStrategies = diagnoseProxyStrategies, diagnosticRoute = probeEndpointRoute, diagnosticMtu = probeMtu, diagnosticComparison = compareProxyPaths, diagnosticBlocklist = null, diagnosticListFetch = null,resourceFetch = null, maintenanceRuntime = null, cloudRestoreCheck = null, telegramOptions = {} } = {}) {
   let maintenanceBusy=false,activeWrites=0;
   const backups=new ConfigurationBackups(store);
   const root = resolve('web/dist');
@@ -87,6 +89,8 @@ export function createServer(store, { supervisor = null, filter = null, interfac
   const routeChange=action=>filterPolicy.change(action,{apply:()=>applyRoutesIfReady(store,supervisor)});
   const inlineChanges=new InlineChanges(async()=>{await filterPolicy.change(()=>{});await applyRoutesIfReady(store,supervisor);},{delay:inlineDelay});
   const resourceDownload=resourceFetch || createResourceFetch({gateways:()=>downloadGateways(store,supervisor)});
+  const telegram=new TelegramNotifications(store,{fetchImpl:resourceDownload,...telegramOptions});
+  const telegramTimer=setInterval(()=>{if(!maintenanceBusy)telegram.tick(n=>observeTelegramRuntime(n,{store,supervisor,filter,accessPoints,modulesHelper:async()=>{const result=await modulesHelper('status');if(result.ok)result.modules.push(domainUpdates.snapshot(),diagnosticListUpdates.snapshot());return result;},networkStatus:process.platform==='linux'?networkStatus:null})).catch(()=>{});},5000);telegramTimer.unref();
   diagnosticBlocklist ||= new DiagnosticBlocklist({fetchImpl:diagnosticListFetch || resourceDownload});
   const gatewaySubscriptions=new GatewaySubscriptions(store,{fetchImpl:resourceDownload,serialize:action=>inlineChanges.enqueue(action),apply:()=>applyRoutesIfReady(store,supervisor),validate:snapshot=>assertNoResolvedAccessPointGateway([snapshot],()=>accessPoints.repository.all())});
   const subscriptionTimer=setInterval(()=>{if(!maintenanceBusy)gatewaySubscriptions.tick().catch(()=>{});},60000);subscriptionTimer.unref();
@@ -182,6 +186,13 @@ export function createServer(store, { supervisor = null, filter = null, interfac
       if(url.pathname.startsWith('/api/')){
         if(!['GET','HEAD'].includes(req.method)){activeWrites++;countedWrite=true;}
       }
+      if(url.pathname.startsWith('/api/telegram')){
+        if(session?.role!=='admin')return send(403,{error:'Insufficient permissions.'});
+        if(key==='GET /api/telegram')return send(200,telegram.status());
+        if(key==='PUT /api/telegram')return send(200,telegram.configure(body));
+        if(key==='POST /api/telegram/chats'){const controller=new AbortController(),abort=()=>controller.abort();res.once('close',abort);try{return send(200,await telegram.chats(body,controller.signal));}finally{res.removeListener('close',abort);}}
+        if(key==='POST /api/telegram/test')return send(200,await telegram.test());
+      }
       if(url.pathname.startsWith('/api/configuration')){
         if(session?.role!=='admin')return send(403,{error:'Insufficient permissions.'});
         const parts=url.pathname.split('/').slice(3),id=parts[1];
@@ -226,6 +237,7 @@ export function createServer(store, { supervisor = null, filter = null, interfac
           try{
             await Promise.all([gatewaySubscriptions.close(),accessPoints.close(),gatewayDeployments.close()]);
             await maintenanceRuntime.stop();
+            telegram.cancel();
             backups.apply(snapshot);
             send(200,{ok:true,restarting:true,backup:safety.id,cloudAccess});
           }finally{
@@ -305,10 +317,11 @@ export function createServer(store, { supervisor = null, filter = null, interfac
         if(req.method==='POST' && !['check','update'].includes(body.op))return send(400,{error:"Unknown update operation."});
         if(req.method==='POST')eventMetadata=moduleAuditDetail(body);
         if(req.method==='POST' && body.id!=='system' && isReleaseManagedModule(body.id))return send(400,{error:'This module is updated with the application.'});
-        if(req.method==='POST' && body.id==='diagnostic-blocklist'){try{return send(202,diagnosticListUpdates.start(body.op,body.version));}catch(error){return send(error.status || 400,{error:error.message});}}
-        if(req.method==='POST' && body.id==='domain-lists'){try{return send(202,domainUpdates.start(body.op,body.version));}catch(error){return send(error.status || 400,{error:error.message});}}
+        if(req.method==='POST' && body.id==='diagnostic-blocklist'){try{const result=diagnosticListUpdates.start(body.op,body.version);if(body.op==='update')telegram.beginUpdate(body.id);return send(202,result);}catch(error){return send(error.status || 400,{error:error.message});}}
+        if(req.method==='POST' && body.id==='domain-lists'){try{const result=domainUpdates.start(body.op,body.version);if(body.op==='update')telegram.beginUpdate(body.id);return send(202,result);}catch(error){return send(error.status || 400,{error:error.message});}}
         const result=req.method==='POST' && body.op==='check' && !body.id?await checkUpdates():await modulesHelper(req.method==='GET'?'status':body.op,body.id,body.version,req.method==='POST'?downloadGateways(store,supervisor):[]);
         if(!result.ok)return send(result.status || 502,{error:result.error});
+        if(req.method==='POST' && body.op==='update')telegram.beginUpdate(body.id);
         if(req.method==='GET'){
           for(const module of result.modules)if(module.id==='frp')module.runtimeState=await accessPoints.moduleState?.() || 'unknown';
           result.modules.push(domainUpdates.snapshot(),diagnosticListUpdates.snapshot());
@@ -727,6 +740,8 @@ export function createServer(store, { supervisor = null, filter = null, interfac
   server.accessPoints=accessPoints;
   server.once('close',()=>{clearInterval(journalTimer);clearInterval(blockedTimer);clearInterval(subscriptionTimer);gatewaySubscriptions.close();blockedJournal.stop();});
   server.once('close',()=>inlineChanges.close());
+  server.once('close',()=>{clearInterval(telegramTimer);telegram.stop();});
+  server.telegram=telegram;
   server.cleanup=Promise.resolve();
   server.once('close',()=>{server.cleanup=Promise.allSettled([accessPoints.close(),gatewayDeployments.close(),gatewaySubscriptions.close()]);});
   return server;

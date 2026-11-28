@@ -5,6 +5,7 @@ import TorGatewayDialog from './components/TorGatewayDialog.vue';
 import GatewayDeployDialog from './components/GatewayDeployDialog.vue';
 import {useModuleManagement} from './composables/useModuleManagement.js';
 import UsersPage from './pages/UsersPage.vue';
+import TelegramPage from './pages/TelegramPage.vue';
 import SystemPage from './pages/SystemPage.vue';
 import ModulesPage from './pages/ModulesPage.vue';
 import GatewaySubscriptions from './components/GatewaySubscriptions.vue';
@@ -139,6 +140,7 @@ const settingsSections = computed(() => [
   'Сеть',
   'DNS',
   'Модули и интеграции',
+  ...(auth.value?.user?.role==='admin' ? ['Telegram'] : []),
   'Интерфейс',
   'Пользователи',
   ...(can('users:write') ? ['Логи'] : [])
@@ -1067,6 +1069,7 @@ onMounted(() => run(loadAuth));
           <BootstrapDialog :open="bootstrapDialog" :catalog="bootstrapCatalog" :existing="dns?dns.defaultNameservers:[]" :disabled="busy" @close="bootstrapDialog=false" @add="addBootstrapIp" />
           <ResolverDialog :open="resolverDialog.open" :title="resolverDialog.title" :resolvers="dnsLibrary" :existing="(dns?.[resolverDialog.list] || []).map(entry=>entry.url)" :disabled="busy" @close="closeResolverDialog" @add="dialogAdd" />
         </template>
+        <TelegramPage v-if="settingsSection==='Telegram' && auth.user.role==='admin'" :api="api" />
         <SystemPage v-if="settingsSection==='Система'" :api="api" :can="can" />
         <ModulesPage v-if="page==='Настройки' && settingsSection==='Модули и интеграции'" :management="moduleManagement" :busy="busy" :loading="tableLoading.modules" :can="can" />
         <template v-if="page==='Настройки' && settingsSection==='Интерфейс'">

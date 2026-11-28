@@ -1,6 +1,6 @@
 export const pagePaths={'Обзор':'/overview','Подключения':'/connections','Клиенты':'/clients','Точки доступа':'/access-points','Журнал':'/journal'};
 export const routePaths={'Домены и IP':'domains','Устройства':'devices','Локальные маршруты':'local'};
-export const settingsPaths={'Система':'system','Сеть':'network','Интерфейс':'interface','DNS':'dns','Модули и интеграции':'modules','Пользователи':'users','Поддержка SSH':'ssh','Логи':'logs','Аккаунт':'account'};
+export const settingsPaths={'Telegram':'telegram','Система':'system','Сеть':'network','Интерфейс':'interface','DNS':'dns','Модули и интеграции':'modules','Пользователи':'users','Поддержка SSH':'ssh','Логи':'logs','Аккаунт':'account'};
 export function locationFor(page,routeSection,settingsSection,connectionSection,clientSection){
  if(page==='Подключения' && connectionSection==='Подписки')return '/connections/subscriptions';
  if(page==='Подключения' && connectionSection==='Группы')return '/connections/groups';

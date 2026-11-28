@@ -29,7 +29,7 @@ function readCurlResponse(bytes,maxBytes){
   return {status,headers,body};
  }
 }
-export function curlRequest(url,{gateway,signal,maxBytes,timeoutMs=25000,headers={}},spawnProcess=spawn){
+export function curlRequest(url,{gateway,signal,maxBytes,timeoutMs=25000,headers={},method,body},spawnProcess=spawn){
  return new Promise((resolve,reject)=>{
   const child=spawnProcess('curl',['--disable','--config','-','--silent','--show-error','--suppress-connect-headers','--dump-header','-','--output','-','--proto','=http,https','--connect-timeout','5','--max-time',String(Math.min(120000,Math.max(1000,timeoutMs))/1000),'--max-filesize',String(maxBytes),'--noproxy',gateway?'':'*'],{stdio:['pipe','pipe','pipe']});
   const chunks=[];let size=0,done=false;
@@ -42,7 +42,7 @@ export function curlRequest(url,{gateway,signal,maxBytes,timeoutMs=25000,headers
    try{finish(null,readCurlResponse(Buffer.concat(chunks),maxBytes));}catch{finish(new PublicError('Invalid download response.'));}
   });
   signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted){abort();return;}
-  const config=[`url = ${JSON.stringify(url)}`,`proxy = ${JSON.stringify(gateway?'http://127.0.0.1:'+gateway.port:'')}`,...(gateway?[`proxy-user = ${JSON.stringify('fg-geo:'+gateway.secret)}`]:[]),...Object.entries(headers).map(([key,value])=>`header = ${JSON.stringify(key+': '+value)}`)];
+  const config=[...(method?[`request = ${JSON.stringify(method)}`]:[]),...(body!==undefined?[`data = ${JSON.stringify(body)}`]:[]),`url = ${JSON.stringify(url)}`,`proxy = ${JSON.stringify(gateway?'http://127.0.0.1:'+gateway.port:'')}`,...(gateway?[`proxy-user = ${JSON.stringify('fg-geo:'+gateway.secret)}`]:[]),...Object.entries(headers).map(([key,value])=>`header = ${JSON.stringify(key+': '+value)}`)];
   child.stdin.on('error',()=>{});child.stdin.end(config.join('\n')+'\n');
  });
 }
@@ -55,11 +55,11 @@ export function createResourceFetch({gateways=()=>[],request=curlRequest,maxByte
    if(options.signal?.aborted)throw new PublicError('Download cancelled.');
    try{let url=original;
     for(let redirects=0;redirects<=5;redirects++){
-     const response=await request(url,{gateway,signal:options.signal,maxBytes:limit,timeoutMs:options.timeoutMs,headers:{'User-Agent':'FreedomGate',...options.headers}});
+     const response=await request(url,{gateway,signal:options.signal,maxBytes:limit,timeoutMs:options.timeoutMs,method:options.method,body:options.body,headers:{'User-Agent':'FreedomGate',...options.headers}});
      if([301,302,303,307,308].includes(response.status)){
       if(options.redirect==='error' || redirects===5)throw Error();const location=response.headers.get('location');if(!location)throw Error();const next=resourceUrl(new URL(location,url).href);if(url.startsWith('https:') && !next.startsWith('https:'))throw Error();url=next;continue;
      }
-     if(response.status<200 || response.status>=300 || response.body.length>limit)throw Error();
+     if((response.status<200 || response.status>=300) && !options.acceptStatus?.(response.status) || response.body.length>limit)throw Error();
      await options.validate?.(response.body,response.headers);
      const result=new Response(response.body,{status:response.status,headers:response.headers});Object.defineProperty(result,'downloadPath',{value:gateway?.id || 'direct'});return result;
     }

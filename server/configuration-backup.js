@@ -1,3 +1,4 @@
+import {telegramRepository,readTelegram,writeTelegram,normalizeTelegram} from './telegram-settings.js';
 import {expandConnectionGroup} from '../shared/connection-groups.js';
 import {CATALOG_FILE,configurationCatalog,compactConfigurationCatalog,mergeConfigurationCatalog} from './configuration-catalog.js';
 import {randomBytes,randomUUID,scrypt as derive,createCipheriv,createDecipheriv} from 'node:crypto';
@@ -47,7 +48,7 @@ export class ConfigurationBackups{
   const tables=Object.fromEntries(TABLES.map(table=>[table,existsTable(this.store.db,table)?this.store.db.prepare(`SELECT * FROM ${table}`).all().map(row=>({...row})):[]]));
   const repositories=Object.fromEntries(SECRET_TABLES.map(table=>[table,existsTable(this.store.db,table)?this.repository(table).all():[]]));
   const files={};for(const file of FILES){try{const path=join(this.stateDir,file);if(!lstatSync(path).isFile())throw fail('Invalid configuration state.',500);if(lstatSync(path).size>BACKUP_LIMIT)throw fail('Configuration file is too large.',413);files[file]=readFileSync(path).toString('base64');}catch(error){if(error.code!=='ENOENT')throw error;}}
-  return this.portable({format:'freedomgate-snapshot',version:2,createdAt:new Date().toISOString(),tables,repositories,files});
+  return this.portable({format:'freedomgate-snapshot',version:2,createdAt:new Date().toISOString(),tables,repositories,files,telegram:readTelegram(telegramRepository(this.store,this.stateDir))});
  }
  // Lists are stored once as module data; route groups carry only stable references.
  portable(snapshot){
@@ -63,6 +64,7 @@ export class ConfigurationBackups{
  validate(snapshot,{factory=false}={}){
   if(!snapshot||snapshot.format!=='freedomgate-snapshot'||![1,2].includes(snapshot.version)||!snapshot.tables||!snapshot.repositories||!snapshot.files)throw fail('Invalid configuration file.');
   if(Object.keys(snapshot.tables).some(t=>!TABLES.includes(t))||Object.keys(snapshot.repositories).some(t=>!SECRET_TABLES.includes(t))||Object.keys(snapshot.files).some(f=>!FILES.includes(f)))throw fail('Unsupported configuration file contents.');
+  if(snapshot.telegram!==undefined)normalizeTelegram({...snapshot.telegram,enabled:false});
   const temp=new Store(':memory:');new Auth(temp.db);
   try{
    for(const table of TABLES){const rows=snapshot.tables[table];if(!Array.isArray(rows)||rows.length>100000)throw fail('Invalid configuration file.');const columns=temp.db.prepare(`PRAGMA table_info(${table})`).all().map(c=>c.name);
@@ -92,9 +94,10 @@ export class ConfigurationBackups{
  }
  writeTables(db,tables){for(const table of [...TABLES].reverse())db.exec(`DELETE FROM ${table}`);for(const table of TABLES)for(const row of tables[table]){const columns=Object.keys(row);db.prepare(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map(()=>'?').join(',')})`).run(...columns.map(c=>row[c]));}}
  apply(snapshot){
+  const telegramRepo=telegramRepository(this.store,this.stateDir);
   const previous={};for(const file of FILES){try{previous[file]=readFileSync(join(this.stateDir,file));}catch(error){if(error.code!=='ENOENT')throw error;previous[file]=null;}}
   const writeFile=(file,bytes)=>{const path=join(this.stateDir,file);if(bytes===null){try{unlinkSync(path);}catch(error){if(error.code!=='ENOENT')throw error;}return;}mkdirSync(dirname(path),{recursive:true,mode:0o700});const pending=path+'.restore-'+randomUUID();writeFileSync(pending,bytes,{mode:0o600,flag:'wx'});renameSync(pending,path);};
-  try{transaction(this.store.db,()=>{this.writeTables(this.store.db,snapshot.tables);for(const table of SECRET_TABLES){const repo=this.repository(table);this.store.db.exec(`DELETE FROM ${table}`);for(const row of snapshot.repositories[table])repo.save(row);}this.store.db.exec('DELETE FROM sessions');for(const table of ['access_point_traffic','events','system_journal_state'])if(existsTable(this.store.db,table))this.store.db.exec(`DELETE FROM ${table}`);for(const file of FILES){
+  try{transaction(this.store.db,()=>{this.writeTables(this.store.db,snapshot.tables);writeTelegram(telegramRepo,{...(snapshot.telegram || {}),enabled:false});if(existsTable(this.store.db,'telegram_delivery'))this.store.db.exec('DELETE FROM telegram_delivery');for(const table of SECRET_TABLES){const repo=this.repository(table);this.store.db.exec(`DELETE FROM ${table}`);for(const row of snapshot.repositories[table])repo.save(row);}this.store.db.exec('DELETE FROM sessions');for(const table of ['access_point_traffic','events','system_journal_state'])if(existsTable(this.store.db,table))this.store.db.exec(`DELETE FROM ${table}`);for(const file of FILES){
      // The catalogue is module data: keep the target installation and add missing saved lists.
      if(file==='domain-lists/catalog.json'){
       if(snapshot.files[file]!==undefined){

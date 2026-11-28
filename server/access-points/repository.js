@@ -4,7 +4,7 @@ import {join} from 'node:path';
 import {publicServer,AccessPointError} from './model.js';
 export class AccessPointRepository{
  constructor(db,{stateDir,table='access_points',present=publicServer,notFound='Access point not found.'}){
-  if(!['access_points','gateway_deployments','gateway_subscriptions'].includes(table))throw Error('Invalid encrypted repository.');
+  if(!['access_points','gateway_deployments','gateway_subscriptions','telegram_integrations'].includes(table))throw Error('Invalid encrypted repository.');
   this.db=db;this.stateDir=stateDir;this.table=table;this.present=present;this.notFound=notFound;
   db.exec(`CREATE TABLE IF NOT EXISTS ${this.table} (id TEXT PRIMARY KEY, value TEXT NOT NULL)`);
  }
